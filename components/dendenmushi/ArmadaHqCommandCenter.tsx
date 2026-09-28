@@ -167,27 +167,23 @@ export const ArmadaHqCommandCenter: React.FC<Props> = ({ onOpenDistressForm }) =
         </div>
       )}
 
-      {/* TOP COMMAND CENTER HEADER */}
-      <div className="bg-[#0D2B3D] border border-[#E8BD61]/40 p-4 rounded-sm abyssal-shadow flex flex-wrap items-center justify-between gap-4 font-mono-signal">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-sm bg-[#E8BD61] text-[#071926] flex items-center justify-center font-bold text-xl border border-[#F0C65D]">
-            🏴
-          </div>
-          <div>
-            <h2 className="font-serif-heading font-black text-lg text-[#E8BD61] tracking-wide">
-              CHOPPER'S ARMADA — GRAND LINE EMERGENCY COMMAND
-            </h2>
-            <p className="text-xs text-[#A8BBC0]">
-              NETWORK: <span className="text-[#6AB897]">ONLINE</span> • ACTIVE CHANNELS: <span className="text-[#E8BD61]">17 ONLINE</span>
-            </p>
-          </div>
+      {/* ARMADA HQ STATUS STRIP */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 px-3 py-2 bg-white/70 backdrop-blur-sm rounded border border-[#b48d4f66] shadow-xs text-xs font-mono">
+        <div className="flex items-center gap-2 text-[#172b31]">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#16a34a] animate-pulse" />
+          <span className="font-bold tracking-wider">
+            ARMADA DISPATCH CONSOLE
+          </span>
+          <span className="text-[#64748b]">· NETWORK: ONLINE</span>
+          <span className="text-[#64748b]">({sessions.length} ACTIVE INCIDENTS)</span>
         </div>
 
         <button
+          type="button"
           onClick={onOpenDistressForm}
-          className="bg-[#B93B32] hover:bg-[#E56659] text-[#F4EAD5] font-bold px-4 py-2 rounded-sm text-xs flex items-center gap-2 border border-[#E56659] abyssal-shadow cursor-pointer"
+          className="bg-[#bd3c32] hover:bg-[#932d27] text-[#fff7df] font-bold px-3 py-1.5 rounded text-[11px] flex items-center gap-1.5 border border-[#932d27] cursor-pointer shadow-xs"
         >
-          <ShieldAlert className="w-4 h-4" />
+          <ShieldAlert className="w-3.5 h-3.5" />
           <span>TRANSMIT DISTRESS SOS</span>
         </button>
       </div>

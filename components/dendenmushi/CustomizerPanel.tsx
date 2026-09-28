@@ -114,22 +114,22 @@ export const CustomizerPanel: React.FC<Props> = ({ config, onChange }) => {
   };
 
   return (
-    <div className="w-full bg-slate-900/90 backdrop-blur-xl border border-amber-600/40 rounded-2xl p-5 space-y-6 text-slate-100 shadow-2xl overflow-y-auto max-h-[720px]">
+    <div className="w-full bg-[#0a2333]/90 backdrop-blur-md border border-[#e8bd6144] rounded p-4 space-y-4 text-[#f4ead5] shadow-md overflow-y-auto max-h-[520px]">
       {/* HEADER & RANDOMIZER */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-amber-500/20">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#e8bd6133]">
         <div>
-          <h2 className="font-nautical font-bold text-lg text-amber-300 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-400" />
-            Character & Facial Customizer
+          <h2 className="font-serif font-bold text-sm text-[#e8bd61] flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#6ab897]" />
+            Snail Shell &amp; Facial Traits
           </h2>
-          <p className="text-xs text-slate-400">Choose official One Piece character preset or load GLB reference model</p>
+          <p className="text-[11px] text-[#a8bbc0] font-mono">Character presets &amp; procedural 3D dial</p>
         </div>
 
         <button
           onClick={handleRandomize}
-          className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer transition transform active:scale-95"
+          className="bg-[#e8bd61] hover:bg-[#f0c65d] text-[#071926] font-mono font-bold px-3 py-1.5 rounded text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition transform active:scale-95"
         >
-          <Dices className="w-4 h-4 animate-spin-slow" />
+          <Dices className="w-3.5 h-3.5" />
           <span>RANDOMIZE</span>
         </button>
       </div>

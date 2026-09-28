@@ -24,7 +24,7 @@ export const DenDenMushiCanvas: React.FC<Props> = ({
   const isGlbMode = config.modelMode === 'glb_law' || config.modelMode === 'glb_law_hd';
 
   return (
-    <div className="w-full h-full min-h-[350px] relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 border border-amber-500/30">
+    <div className="w-full h-full min-h-[200px] relative rounded-lg overflow-hidden shadow-xl bg-gradient-to-b from-[#0a2333] via-[#071926] to-[#04121b] border border-[#e8bd6144]">
       <Canvas shadows>
         <PerspectiveCamera makeDefault position={[0, 0.4, 4.2]} fov={45} />
         

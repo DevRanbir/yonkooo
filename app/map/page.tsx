@@ -230,7 +230,7 @@ export default function MapPage() {
         <Link href="/dashboard" className="frame-button frame-dashboard">
           DASHBOARD
         </Link>
-        <Link href="/map" className="frame-button frame-contact">
+        <Link href="/contact" className="frame-button frame-contact">
           CONTACT
         </Link>
         <Link href="/map" className="frame-button frame-map">

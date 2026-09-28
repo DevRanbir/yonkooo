@@ -1,30 +1,98 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, AlertTriangle, Mic, MicOff, Send, Camera, Sparkles, Volume2, ShieldAlert } from 'lucide-react';
+import {
+  Phone,
+  PhoneOff,
+  Mic,
+  MicOff,
+  Send,
+  Camera,
+  Sparkles,
+  Volume2,
+  VolumeX,
+  ShieldAlert,
+  MessageSquare,
+  Palette,
+  Dices,
+  Box,
+  Code,
+  FileText,
+  Radio,
+  UserCheck
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
+import {
+  MushiConfig,
+  ChatMessage,
+  SosSession,
+  MushiEmotionalState,
+  RegionTheme,
+  CharacterPresetId,
+  ModelMode
+} from '@/lib/dendenmushi/mushi';
+import { CHARACTER_PRESETS } from '@/lib/dendenmushi/characterPresets';
+import { generateRandomSeed, generateMushiFromSeed } from '@/lib/dendenmushi/seedGenerator';
+import { soundEngine } from '@/lib/dendenmushi/soundEngine';
+import { MushiBrain } from '@/lib/dendenmushi/aiBrain';
+import { networkSync } from '@/lib/dendenmushi/networkSync';
+import { faceTracker } from '@/lib/dendenmushi/faceTracker';
+
 const DenDenMushiCanvas = dynamic(
   () => import('./DenDenMushiCanvas').then((mod) => mod.DenDenMushiCanvas),
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full min-h-[350px] rounded-2xl flex flex-col items-center justify-center bg-[#071926] border border-[#e8bd61]/40 text-[#e8bd61] font-mono text-xs gap-3">
+      <div className="w-full h-full min-h-[220px] rounded-lg flex flex-col items-center justify-center bg-[#071926] border border-[#e8bd6144] text-[#e8bd61] font-mono text-xs gap-3">
         <div className="w-8 h-8 rounded-full border-2 border-[#e8bd61] border-t-transparent animate-spin" />
         <span>INITIALIZING 3D TRANSPONDER SNAIL...</span>
       </div>
     )
   }
 );
-import { MushiConfig, ChatMessage, CallState, SosSession, MushiEmotionalState } from '@/lib/dendenmushi/mushi';
-import { soundEngine } from '@/lib/dendenmushi/soundEngine';
-import { MushiBrain } from '@/lib/dendenmushi/aiBrain';
-import { networkSync } from '@/lib/dendenmushi/networkSync';
-import { faceTracker } from '@/lib/dendenmushi/faceTracker';
+
+const REGION_LIST: { id: RegionTheme; name: string }[] = [
+  { id: 'east_blue', name: '🌊 East Blue' },
+  { id: 'marine', name: '⚓ Marine Navy' },
+  { id: 'pirate', name: '🏴‍☠️ Pirate Fleet' },
+  { id: 'wano', name: '🌸 Wano Country' },
+  { id: 'water_7', name: '🔨 Water 7' },
+  { id: 'royal', name: '👑 Royal Palace' },
+  { id: 'cp0', name: '🕵️ CP0 Cipher Pol' },
+  { id: 'golden_buster', name: '🚨 Buster Call' }
+];
+
+const CHARACTER_BUTTONS: { id: CharacterPresetId; label: string; icon: string; defaultGlb?: boolean }[] = [
+  { id: 'law', label: 'Trafalgar Law', icon: '🐯', defaultGlb: true },
+  { id: 'luffy', label: 'Straw Hat Luffy', icon: '👒' },
+  { id: 'buster_call', label: 'Golden Buster Call', icon: '🚨' },
+  { id: 'whitebeard', label: 'Whitebeard', icon: '👑' },
+  { id: 'doflamingo', label: 'Doflamingo', icon: '🦩' },
+  { id: 'kizaru', label: 'Admiral Kizaru', icon: '⚡' },
+  { id: 'smoker', label: 'Vice Admiral Smoker', icon: '💨' },
+  { id: 'crocodile', label: 'Sir Crocodile', icon: '🐊' },
+  { id: 'buggy', label: 'Buggy the Clown', icon: '🔴' },
+  { id: 'franky', label: 'Franky Cyborg', icon: '🤖' }
+];
 
 interface Props {
   config: MushiConfig;
+  onConfigChange?: (newConfig: MushiConfig) => void;
+  onSelectRegion?: (region: RegionTheme) => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
+  onOpenDistressForm?: () => void;
+  onOpenEmbed?: () => void;
 }
 
-export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
+export const CallerDistressTerminal: React.FC<Props> = ({
+  config,
+  onConfigChange,
+  onSelectRegion,
+  isMuted = false,
+  onToggleMute,
+  onOpenDistressForm,
+  onOpenEmbed
+}) => {
   const [session, setSession] = useState<SosSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'connecting' | 'connected' | 'ended'>('idle');
@@ -36,6 +104,8 @@ export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
   const [isCameraTracking, setIsCameraTracking] = useState(false);
   const [trackingCoords, setTrackingCoords] = useState<{ x: number; y: number } | null>(null);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const [activeTab, setActiveTab] = useState<'chat' | 'customizer' | 'hq'>('chat');
+  const [hqSessions, setHqSessions] = useState<SosSession[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const aiBrain = useRef<MushiBrain>(new MushiBrain(config));
@@ -57,9 +127,11 @@ export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Subscribe to network sync events (e.g. when HQ operator answers call or sends operator message!)
   useEffect(() => {
+    setHqSessions(networkSync.getActiveSessions());
     const unsubscribe = networkSync.subscribe((event) => {
+      setHqSessions(networkSync.getActiveSessions());
+
       if (event.type === 'HQ_ANSWER_CALL' && session && event.payload.sessionId === session.sessionId) {
         setCallStatus('connected');
         setMushiState('listening');
@@ -114,7 +186,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
     networkSync.saveActiveSessions([newSession, ...active]);
     networkSync.broadcast('NEW_SOS_SESSION', newSession);
 
-    // Auto-answer simulation after 2 seconds if HQ is unmanned
+    // Auto-answer simulation after 2.2 seconds if HQ is unmanned
     setTimeout(() => {
       setCallStatus('connected');
       setMushiState('listening');
@@ -134,7 +206,6 @@ export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
     soundEngine.playAlertTone();
     addMessage('user', userText);
     setInputText('');
-
     setMushiState('listening');
 
     // Process through Sarvam AI Brain
@@ -184,7 +255,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
       sosAlert,
       mushiName: config.name
     };
-    setMessages(prev => [...prev, msg]);
+    setMessages((prev) => [...prev, msg]);
   };
 
   const handleHangUp = () => {
@@ -216,7 +287,6 @@ export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
       setIsListening(true);
       soundEngine.startListening(
         (transcript) => {
-          // Cleanly replace with base typed text + current speech transcript without duplicating!
           const base = initialInputRef.current;
           setInputText(base ? `${base} ${transcript}` : transcript);
         },
@@ -260,172 +330,480 @@ export const CallerDistressTerminal: React.FC<Props> = ({ config }) => {
     }
   };
 
+  const handleRandomize = () => {
+    if (onConfigChange) {
+      const newSeed = generateRandomSeed();
+      const newConfig = generateMushiFromSeed(newSeed);
+      onConfigChange(newConfig);
+    }
+  };
+
+  const handleSelectPreset = (presetId: CharacterPresetId, useGlb?: boolean) => {
+    if (onConfigChange) {
+      const preset = CHARACTER_PRESETS[presetId];
+      if (preset) {
+        onConfigChange({
+          ...preset,
+          seed: config.seed,
+          modelMode: useGlb ? 'glb_law' : preset.modelMode || 'procedural'
+        });
+      }
+    }
+  };
+
   return (
-    <div className="w-full flex flex-col gap-6">
-      {/* TOP EMERGENCY CALLER BAR */}
-      <div className="bg-[#0D2B3D] border border-[#B93B32] p-4 rounded-sm abyssal-shadow flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-sm bg-[#B93B32] text-[#F4EAD5] flex items-center justify-center font-bold text-xl animate-pulse">
-            🚨
+    <div className="w-full h-full grid grid-cols-1 md:grid-cols-12 gap-2.5 items-stretch min-h-0 select-none">
+      {/* 🐌 LEFT COLUMN: Interactive 3D Den Den Mushi Viewport */}
+      <div className="md:col-span-6 lg:col-span-7 h-full flex flex-col relative rounded-md overflow-hidden border border-[#e8bd6144] bg-[#071926]/90 backdrop-blur-md shadow-2xl min-h-0">
+        {/* Floating Top HUD Strip */}
+        <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none z-20 gap-2">
+          {/* Status & Channel */}
+          <div className="pointer-events-auto flex items-center gap-1.5 px-2 py-1 rounded bg-[#071926]/90 border border-[#e8bd6144] text-[10px] font-mono text-[#f4ead5] shadow-md backdrop-blur-xs">
+            <span className="w-2 h-2 rounded-full bg-[#6ab897] animate-pulse" />
+            <span className="font-bold text-[#e8bd61]">FREQ 07</span>
+            <span className="text-[#a8bbc0] hidden sm:inline">· {session ? session.sessionId : 'STANDBY'}</span>
           </div>
-          <div>
-            <h2 className="font-serif-heading font-black text-lg text-[#E8BD61] tracking-wide">
-              DEN DEN MUSHI CALLER TERMINAL (/distress)
-            </h2>
-            <p className="text-xs font-mono-signal text-[#A8BBC0]">
-              SESSION: {session ? session.sessionId : 'STANDBY'} • CHANNEL: 07 (EMERGENCY)
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {/* CAMERA FACE TRACKING TOGGLE */}
-          <button
-            onClick={toggleCameraTracking}
-            className={`px-3 py-1.5 rounded-sm border text-xs font-mono-signal font-bold flex items-center gap-1.5 transition cursor-pointer ${
-              isCameraTracking
-                ? 'bg-[#6AB897] text-[#071926] border-[#6AB897]'
-                : 'bg-[#071926] text-[#A8BBC0] border-slate-800'
-            }`}
-          >
-            <Camera className="w-4 h-4" />
-            <span>{isCameraTracking ? 'FACE TRACKING: ACTIVE' : 'TRACKING: POINTER'}</span>
-          </button>
-
-          {callStatus === 'idle' ? (
-            <button
-              onClick={handleSendDistressSignal}
-              className="bg-[#B93B32] hover:bg-[#E56659] text-[#F4EAD5] font-mono-signal font-bold px-4 py-2 rounded-sm text-xs sm:text-sm flex items-center gap-2 border border-[#E56659] abyssal-shadow cursor-pointer transition transform active:scale-95 animate-pulse"
-            >
-              <Phone className="w-4 h-4" />
-              <span>📞 SEND DISTRESS SIGNAL</span>
-            </button>
-          ) : (
-            <button
-              onClick={handleHangUp}
-              className="bg-[#B93B32] hover:bg-[#E56659] text-[#F4EAD5] font-mono-signal font-bold px-4 py-2 rounded-sm text-xs flex items-center gap-2 border border-[#E56659] abyssal-shadow cursor-pointer"
-            >
-              <PhoneOff className="w-4 h-4" />
-              <span>END TRANSMISSION</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 3D DEN DEN MUSHI PLATFORM VIEWPORT */}
-      <div className="h-[380px] w-full relative">
-        <DenDenMushiCanvas
-          config={config}
-          isRinging={callStatus === 'calling'}
-          isSpeaking={isSpeaking}
-          audioVolume={audioVolume}
-          trackingCoords={trackingCoords}
-        />
-
-        {/* EMOTIONAL STATE BADGE */}
-        <div className="absolute bottom-3 left-3 bg-[#071926]/90 backdrop-blur-md px-3 py-1.5 rounded-sm border border-[#E8BD61]/40 text-xs font-mono-signal text-[#E8BD61] flex items-center gap-2">
-          <span>EMOTION:</span>
-          <span className="uppercase font-bold text-[#6AB897]">{mushiState.replace('_', ' ')}</span>
-        </div>
-
-        {/* CAMERA FACE TRACKING HUD PREVIEW */}
-        {isCameraTracking && (
-          <div className="absolute top-3 right-3 bg-[#071926]/90 border border-[#6AB897] p-1.5 rounded-sm abyssal-shadow z-20 flex flex-col items-center">
-            <div ref={cameraPreviewRef} className="w-28 h-20 bg-black rounded-sm overflow-hidden border border-[#6AB897]/50 relative">
-              <div className={`absolute inset-0 border-2 ${isFaceDetected ? 'border-[#6AB897] animate-pulse' : 'border-[#E8BD61]/40'} m-2 rounded-sm pointer-events-none flex items-center justify-center`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${isFaceDetected ? 'bg-[#6AB897]' : 'bg-[#E8BD61]'}`} />
-              </div>
-            </div>
-            <div className="text-[10px] font-mono-signal font-bold mt-1 text-[#6AB897] flex items-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${isFaceDetected ? 'bg-[#6AB897] animate-ping' : 'bg-[#E8BD61]'}`} />
-              <span>{isFaceDetected ? 'FACE LOCKED' : 'SCANNING FACE...'}</span>
-            </div>
-          </div>
-        )}
-
-        {/* 📼 RECORDING NOTICE */}
-        {session && (
-          <div className="absolute bottom-3 right-3 bg-[#B93B32] text-[#F4EAD5] px-3 py-1.5 rounded-sm text-xs font-mono-signal font-bold flex items-center gap-2 animate-pulse abyssal-shadow">
-            <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-            <span>📼 00:02:45 RECORDING LIVE</span>
-          </div>
-        )}
-      </div>
-
-      {/* CALLER DISPATCH CHAT & TRANSMISSION */}
-      <div className="bg-[#0D2B3D] border border-[#E8BD61]/40 rounded-sm p-4 sm:p-6 abyssal-shadow space-y-4">
-        <div className="flex items-center justify-between border-b border-[#E8BD61]/20 pb-3">
-          <h3 className="font-serif-heading font-bold text-md text-[#E8BD61] flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#6AB897]" />
-            Live Voice & Dispatch Channel
-          </h3>
-          <span className="text-xs font-mono-signal text-[#A8BBC0]">
-            LOCATION: Water 7 — Harbor District
-          </span>
-        </div>
-
-        {/* TRANSCRIPT FEED */}
-        <div className="overflow-y-auto space-y-3 max-h-[240px] pr-2">
-          {messages.length === 0 ? (
-            <div className="p-4 text-center border border-dashed border-[#E8BD61]/30 rounded-sm bg-[#071926] text-[#A8BBC0] text-xs font-mono-signal">
-              Press <span className="text-[#B93B32] font-bold">"📞 SEND DISTRESS SIGNAL"</span> to initiate live emergency transmission with Armada HQ!
-            </div>
-          ) : (
-            messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+          {/* Top Quick Actions */}
+          <div className="pointer-events-auto flex items-center gap-1">
+            {/* Region Selector Dropdown */}
+            {onSelectRegion && (
+              <select
+                value={config.region}
+                onChange={(e) => onSelectRegion(e.target.value as RegionTheme)}
+                className="bg-[#071926]/90 border border-[#e8bd6144] text-[#e8bd61] rounded px-1.5 py-1 text-[10px] font-mono font-bold cursor-pointer focus:outline-none"
+                aria-label="Select Region"
               >
-                <div className="flex items-center gap-1.5 mb-1 text-[11px] font-mono-signal text-[#A8BBC0]">
-                  <span>{msg.sender === 'user' ? '👤 CALLER' : msg.sender === 'operator' ? '🏴 ARMADA HQ OPERATOR' : `🐌 ${msg.mushiName || config.name}`}</span>
-                  <span>•</span>
-                  <span>{msg.timestamp}</span>
-                </div>
-                <div
-                  className={`max-w-[85%] px-4 py-2.5 rounded-sm text-sm leading-relaxed abyssal-shadow ${
-                    msg.sender === 'user'
-                      ? 'bg-[#E8BD61] text-[#172D36] font-semibold'
-                      : msg.sender === 'operator'
-                      ? 'bg-[#6AB897] text-[#071926] font-bold'
-                      : 'bg-[#F4E3BE] text-[#172D36] font-medium'
-                  }`}
-                >
-                  {msg.text}
-                </div>
-              </div>
-            ))
-          )}
-          <div ref={chatEndRef} />
+                {REGION_LIST.map((r) => (
+                  <option key={r.id} value={r.id} className="bg-[#071926] text-[#f4ead5]">
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Camera Face Tracking Toggle */}
+            <button
+              type="button"
+              onClick={toggleCameraTracking}
+              className={`p-1.5 rounded border text-[10px] font-mono transition cursor-pointer flex items-center gap-1 ${
+                isCameraTracking
+                  ? 'bg-[#6ab897] text-[#071926] border-[#6ab897] font-bold'
+                  : 'bg-[#071926]/90 text-[#a8bbc0] border-[#e8bd6144] hover:text-[#f4ead5]'
+              }`}
+              title={isCameraTracking ? 'Face Tracking Active' : 'Switch to Camera Face Tracking'}
+            >
+              <Camera size={12} />
+              <span className="hidden sm:inline">{isCameraTracking ? 'FACE ON' : 'POINTER'}</span>
+            </button>
+
+            {/* Sound Mute Toggle */}
+            {onToggleMute && (
+              <button
+                type="button"
+                onClick={onToggleMute}
+                className="p-1.5 rounded border border-[#e8bd6144] bg-[#071926]/90 text-[#e8bd61] hover:text-white transition cursor-pointer"
+                title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+              >
+                {isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* INPUT FORM */}
-        <form onSubmit={(e) => { e.preventDefault(); if (inputText.trim()) handleSendMessage(inputText); }} className="flex items-center gap-2 pt-2">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder={isListening ? 'Listening dictation...' : 'Type full distress message here...'}
-            className="flex-1 bg-[#071926] text-[#F4EAD5] placeholder-[#A8BBC0] border border-[#E8BD61]/40 rounded-sm px-4 py-2.5 text-sm font-sans-body focus:outline-none focus:border-[#E8BD61]"
+        {/* 3D Canvas Viewport */}
+        <div className="flex-1 w-full h-full min-h-0 relative">
+          <DenDenMushiCanvas
+            config={config}
+            isRinging={callStatus === 'calling'}
+            isSpeaking={isSpeaking}
+            audioVolume={audioVolume}
+            trackingCoords={trackingCoords}
           />
+        </div>
+
+        {/* Floating Bottom HUD Strip */}
+        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none z-20 gap-2">
+          {/* Emotion Badge */}
+          <div className="pointer-events-auto flex items-center gap-1 px-2 py-1 rounded bg-[#071926]/90 border border-[#e8bd6144] text-[10px] font-mono text-[#e8bd61] shadow-md backdrop-blur-xs">
+            <span className="text-[#a8bbc0]">EMOTION:</span>
+            <span className="font-bold text-[#6ab897] uppercase">{mushiState.replace('_', ' ')}</span>
+          </div>
+
+          {/* Primary SOS Action Button */}
+          <div className="pointer-events-auto flex items-center gap-1.5">
+            {session && (
+              <div className="bg-[#b93b32] text-white px-2 py-1 rounded text-[10px] font-mono font-bold flex items-center gap-1 animate-pulse shadow-md">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                <span>REC LIVE</span>
+              </div>
+            )}
+
+            {callStatus === 'idle' || callStatus === 'ended' ? (
+              <button
+                type="button"
+                onClick={handleSendDistressSignal}
+                className="bg-[#bd3c32] hover:bg-[#932d27] text-[#fff7df] font-mono font-bold px-3 py-1.5 rounded text-[11px] flex items-center gap-1.5 border border-[#e56659] cursor-pointer shadow-lg animate-pulse transition"
+              >
+                <Phone size={12} />
+                <span>DIAL DISTRESS CALL</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleHangUp}
+                className="bg-[#bd3c32] hover:bg-[#932d27] text-[#fff7df] font-mono font-bold px-3 py-1.5 rounded text-[11px] flex items-center gap-1.5 border border-[#e56659] cursor-pointer shadow-lg transition"
+              >
+                <PhoneOff size={12} />
+                <span>END CALL</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Face Tracking Camera Preview Mini-PIP */}
+        {isCameraTracking && (
+          <div className="absolute top-10 right-2 bg-[#071926]/95 border border-[#6ab897] p-1 rounded z-30 flex flex-col items-center shadow-xl">
+            <div ref={cameraPreviewRef} className="w-20 h-14 bg-black rounded overflow-hidden border border-[#6ab897]/50 relative">
+              <div className={`absolute inset-0 border ${isFaceDetected ? 'border-[#6ab897] animate-pulse' : 'border-[#e8bd61]/40'} m-1 rounded pointer-events-none flex items-center justify-center`}>
+                <div className={`w-1 h-1 rounded-full ${isFaceDetected ? 'bg-[#6ab897]' : 'bg-[#e8bd61]'}`} />
+              </div>
+            </div>
+            <span className="text-[8px] font-mono font-bold mt-0.5 text-[#6ab897]">
+              {isFaceDetected ? '● LOCKED' : 'SCANNING'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* 🎛️ RIGHT COLUMN: Tabbed Console (Chat | Customizer | Fleet HQ) */}
+      <div className="md:col-span-6 lg:col-span-5 h-full flex flex-col rounded-md overflow-hidden border border-[#e8bd6144] bg-[#071926]/90 backdrop-blur-md shadow-2xl min-h-0">
+        {/* Tab Switcher Header */}
+        <div className="flex items-center gap-1 p-1 bg-[#04121b]/80 border-b border-[#e8bd6133] shrink-0 text-xs font-mono">
           <button
             type="button"
-            onClick={handleToggleMic}
-            className={`p-2.5 rounded-sm border font-mono-signal font-bold transition cursor-pointer ${
-              isListening ? 'bg-[#B93B32] text-white animate-pulse' : 'bg-[#071926] text-[#E8BD61] border-[#E8BD61]/40'
+            onClick={() => setActiveTab('chat')}
+            className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 font-bold text-[11px] transition cursor-pointer ${
+              activeTab === 'chat'
+                ? 'bg-[#e8bd61] text-[#071926]'
+                : 'text-[#a8bbc0] hover:text-[#f4ead5]'
             }`}
           >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            <MessageSquare size={11} />
+            <span>Voice &amp; Chat</span>
           </button>
           <button
-            type="submit"
-            disabled={!inputText.trim()}
-            className="bg-[#E8BD61] hover:bg-[#F0C65D] disabled:opacity-40 text-[#071926] font-mono-signal font-bold px-5 py-2.5 rounded-sm transition flex items-center gap-1.5 abyssal-shadow cursor-pointer"
+            type="button"
+            onClick={() => setActiveTab('customizer')}
+            className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 font-bold text-[11px] transition cursor-pointer ${
+              activeTab === 'customizer'
+                ? 'bg-[#e8bd61] text-[#071926]'
+                : 'text-[#a8bbc0] hover:text-[#f4ead5]'
+            }`}
           >
-            <Send className="w-4 h-4" />
+            <Palette size={11} />
+            <span>Snail Traits</span>
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setActiveTab('hq')}
+            className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 font-bold text-[11px] transition cursor-pointer ${
+              activeTab === 'hq'
+                ? 'bg-[#6ab897] text-[#071926]'
+                : 'text-[#a8bbc0] hover:text-[#f4ead5]'
+            }`}
+          >
+            <ShieldAlert size={11} />
+            <span>HQ Radar</span>
+          </button>
+        </div>
+
+        {/* TAB 1: Live Voice & Chat */}
+        {activeTab === 'chat' && (
+          <div className="flex-1 flex flex-col min-h-0 p-2.5">
+            {/* Transcript Feed */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 text-xs">
+              {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center p-4 text-center border border-dashed border-[#e8bd6133] rounded bg-[#04121b]/50 text-[#a8bbc0] space-y-2">
+                  <span className="text-2xl">🐌</span>
+                  <p className="font-mono text-[11px]">
+                    Channel 07 Standby. Click <span className="text-[#e56659] font-bold">&quot;DIAL DISTRESS CALL&quot;</span> or type below to transmit distress signals!
+                  </p>
+                  <p className="text-[10px] text-[#6ab897]">
+                    Speech synthesis &amp; real-time voice AI active.
+                  </p>
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="flex items-center gap-1 mb-0.5 text-[9px] font-mono text-[#a8bbc0]">
+                      <span>
+                        {msg.sender === 'user'
+                          ? '👤 YOU'
+                          : msg.sender === 'operator'
+                          ? '🏴 FLEET OPERATOR'
+                          : `🐌 ${msg.mushiName || config.name}`}
+                      </span>
+                      <span>•</span>
+                      <span>{msg.timestamp}</span>
+                    </div>
+                    <div
+                      className={`max-w-[88%] px-2.5 py-1.5 rounded text-[11px] leading-relaxed shadow-xs ${
+                        msg.sender === 'user'
+                          ? 'bg-[#e8bd61] text-[#071926] font-semibold'
+                          : msg.sender === 'operator'
+                          ? 'bg-[#6ab897] text-[#071926] font-semibold'
+                          : 'bg-[#0d2b3d] border border-[#e8bd6144] text-[#f4ead5]'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Audio Wave Indicator when Snail Speaks */}
+            {isSpeaking && (
+              <div className="py-1 px-2 mb-1 bg-[#6ab897]/20 border border-[#6ab897]/50 rounded flex items-center justify-between text-[10px] font-mono text-[#6ab897] animate-pulse">
+                <span>🔊 SYNTHESIZING VOICE PLAYBACK...</span>
+                <span className="flex items-center gap-0.5">
+                  <span className="w-1 h-2 bg-[#6ab897] animate-bounce" />
+                  <span className="w-1 h-3 bg-[#6ab897] animate-bounce delay-75" />
+                  <span className="w-1 h-1 bg-[#6ab897] animate-bounce delay-150" />
+                </span>
+              </div>
+            )}
+
+            {/* Chat Input Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (inputText.trim()) handleSendMessage(inputText);
+              }}
+              className="flex items-center gap-1.5 pt-2 border-t border-[#e8bd6133] shrink-0"
+            >
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder={isListening ? 'Listening dictation...' : 'Type distress message...'}
+                className="flex-1 bg-[#04121b] text-[#f4ead5] placeholder-[#a8bbc0] border border-[#e8bd6144] rounded px-2.5 py-1.5 text-xs font-sans focus:outline-none focus:border-[#e8bd61]"
+              />
+              <button
+                type="button"
+                onClick={handleToggleMic}
+                className={`p-1.5 rounded border transition cursor-pointer shrink-0 ${
+                  isListening
+                    ? 'bg-[#b93b32] text-white animate-pulse border-[#e56659]'
+                    : 'bg-[#04121b] text-[#e8bd61] border-[#e8bd6144] hover:bg-[#0d2b3d]'
+                }`}
+                title={isListening ? 'Stop Mic Dictation' : 'Speak via Microphone'}
+              >
+                {isListening ? <MicOff size={13} /> : <Mic size={13} />}
+              </button>
+              <button
+                type="submit"
+                disabled={!inputText.trim()}
+                className="bg-[#e8bd61] hover:bg-[#f0c65d] disabled:opacity-40 text-[#071926] font-mono font-bold px-3 py-1.5 rounded text-xs transition flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <Send size={12} />
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 2: Snail Trait Customizer */}
+        {activeTab === 'customizer' && (
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-3 min-h-0 text-xs font-mono">
+            {/* Header + Randomizer */}
+            <div className="flex items-center justify-between pb-1.5 border-b border-[#e8bd6133]">
+              <div>
+                <span className="font-bold text-[#e8bd61] flex items-center gap-1 text-[11px]">
+                  <Sparkles size={11} className="text-[#6ab897]" />
+                  TRAIT CUSTOMIZER
+                </span>
+                <span className="text-[10px] text-[#a8bbc0]">Live 3D snail updates</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRandomize}
+                className="bg-[#e8bd61] hover:bg-[#f0c65d] text-[#071926] font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1 cursor-pointer transition"
+              >
+                <Dices size={11} />
+                <span>RANDOMIZE</span>
+              </button>
+            </div>
+
+            {/* 3D Model Mode Toggle */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-[#e8bd61] flex items-center gap-1 uppercase">
+                <Box size={10} /> 3D Model Engine
+              </label>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  onClick={() => onConfigChange && onConfigChange({ ...config, modelMode: 'procedural' })}
+                  className={`py-1 px-1.5 rounded border text-[10px] font-bold cursor-pointer transition ${
+                    config.modelMode === 'procedural'
+                      ? 'bg-[#e8bd61] text-[#071926] border-[#e8bd61]'
+                      : 'bg-[#04121b] text-[#a8bbc0] border-[#e8bd6133] hover:text-[#f4ead5]'
+                  }`}
+                >
+                  🎨 Procedural
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onConfigChange && onConfigChange({ ...config, modelMode: 'glb_law' })}
+                  className={`py-1 px-1.5 rounded border text-[10px] font-bold cursor-pointer transition ${
+                    config.modelMode === 'glb_law'
+                      ? 'bg-[#6ab897] text-[#071926] border-[#6ab897]'
+                      : 'bg-[#04121b] text-[#a8bbc0] border-[#e8bd6133] hover:text-[#f4ead5]'
+                  }`}
+                >
+                  📦 Law 3D GLB
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onConfigChange && onConfigChange({ ...config, modelMode: 'glb_law_hd' })}
+                  className={`py-1 px-1.5 rounded border text-[10px] font-bold cursor-pointer transition ${
+                    config.modelMode === 'glb_law_hd'
+                      ? 'bg-[#a855f7] text-white border-[#a855f7]'
+                      : 'bg-[#04121b] text-[#a8bbc0] border-[#e8bd6133] hover:text-[#f4ead5]'
+                  }`}
+                >
+                  💎 Law HD
+                </button>
+              </div>
+            </div>
+
+            {/* Official Character Presets */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-[#e8bd61] flex items-center gap-1 uppercase">
+                <UserCheck size={10} /> Character Archetypes
+              </label>
+              <div className="grid grid-cols-2 gap-1 max-h-[140px] overflow-y-auto pr-0.5">
+                {CHARACTER_BUTTONS.map((char) => (
+                  <button
+                    key={char.id}
+                    type="button"
+                    onClick={() => handleSelectPreset(char.id, char.defaultGlb)}
+                    className="p-1.5 rounded bg-[#04121b] hover:bg-[#0d2b3d] border border-[#e8bd6133] hover:border-[#e8bd61] flex items-center gap-1 text-[10px] text-left transition cursor-pointer text-[#f4ead5]"
+                  >
+                    <span>{char.icon}</span>
+                    <span className="truncate">{char.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Color Swatches */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-[#e8bd61] flex items-center gap-1 uppercase">
+                <Palette size={10} /> Shell &amp; Body Color
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-[#a8bbc0]">Shell:</span>
+                  <input
+                    type="color"
+                    value={config.shell.primaryColor || '#e8bd61'}
+                    onChange={(e) =>
+                      onConfigChange &&
+                      onConfigChange({
+                        ...config,
+                        shell: { ...config.shell, primaryColor: e.target.value }
+                      })
+                    }
+                    className="w-6 h-6 rounded border border-[#e8bd6144] cursor-pointer bg-transparent"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-[#a8bbc0]">Skin:</span>
+                  <input
+                    type="color"
+                    value={config.body.bodyColor || '#6ab897'}
+                    onChange={(e) =>
+                      onConfigChange &&
+                      onConfigChange({
+                        ...config,
+                        body: { ...config.body, bodyColor: e.target.value }
+                      })
+                    }
+                    className="w-6 h-6 rounded border border-[#e8bd6144] cursor-pointer bg-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Armada HQ Radar */}
+        {activeTab === 'hq' && (
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-0 text-xs font-mono">
+            <div className="flex items-center justify-between pb-1.5 border-b border-[#e8bd6133]">
+              <span className="font-bold text-[#6ab897] flex items-center gap-1 text-[11px]">
+                <ShieldAlert size={11} />
+                FLEET EMERGENCY RADAR
+              </span>
+              <span className="text-[10px] text-[#6ab897] font-bold">ONLINE</span>
+            </div>
+
+            <p className="text-[10px] text-[#a8bbc0] leading-relaxed">
+              Monitoring all Grand Line distress frequencies. Incoming calls automatically populate the triage queue.
+            </p>
+
+            {/* Active Sessions List */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-[#e8bd61]">ACTIVE SIGNALS ({hqSessions.length}):</span>
+              {hqSessions.length === 0 ? (
+                <div className="p-2 text-center border border-dashed border-[#e8bd6133] rounded text-[#a8bbc0] text-[10px]">
+                  No active distress calls. Channel 07 clear.
+                </div>
+              ) : (
+                hqSessions.slice(0, 3).map((s) => (
+                  <div key={s.sessionId} className="p-2 rounded bg-[#04121b] border border-[#e8bd6133] space-y-1 text-[10px]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#e8bd61]">{s.sessionId}</span>
+                      <span className="text-[#e56659] font-bold">{s.severity.toUpperCase()}</span>
+                    </div>
+                    <div className="text-[#a8bbc0]">{s.locationName} · {s.incidentType}</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Triggers */}
+            <div className="pt-2 flex flex-col gap-1.5">
+              {onOpenDistressForm && (
+                <button
+                  type="button"
+                  onClick={onOpenDistressForm}
+                  className="w-full bg-[#bd3c32] hover:bg-[#932d27] text-white font-bold py-1.5 px-2 rounded text-[11px] transition cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <FileText size={11} />
+                  <span>TRANSMIT SOS LOG FORM</span>
+                </button>
+              )}
+
+              {onOpenEmbed && (
+                <button
+                  type="button"
+                  onClick={onOpenEmbed}
+                  className="w-full bg-[#04121b] hover:bg-[#0d2b3d] text-[#e8bd61] border border-[#e8bd6144] font-bold py-1.5 px-2 rounded text-[10px] transition cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <Code size={11} />
+                  <span>GET EMBED / API CODE</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-
