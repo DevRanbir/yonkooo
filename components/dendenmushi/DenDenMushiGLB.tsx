@@ -80,7 +80,7 @@ export const DenDenMushiGLB: React.FC<Props> = ({
   });
 
   return (
-    <group ref={groupRef} position={[0, -0.5, 0]} scale={isHd ? 0.75 : 1.25}>
+    <group ref={groupRef} position={[0, -0.28, 0]} scale={isHd ? 0.8 : 1.3}>
       <primitive object={scene} />
     </group>
   );

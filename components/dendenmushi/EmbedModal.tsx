@@ -51,82 +51,82 @@ export default function MySite() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-2xl w-full p-6 space-y-5 text-slate-100 shadow-2xl relative">
+    <div className="fixed inset-0 z-50 bg-[#020b12]/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-[#fcf8f0] border-2 border-[#b8860b] rounded-lg max-w-2xl w-full p-6 space-y-4 text-[#172b31] shadow-2xl relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white transition cursor-pointer"
+          className="absolute top-4 right-4 text-[#52636a] hover:text-[#bd3c32] transition cursor-pointer font-bold"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-3 border-b border-amber-500/20 pb-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xl">
+        <div className="flex items-center gap-3 border-b border-[#c8aa6d]/60 pb-3">
+          <div className="w-10 h-10 rounded-lg bg-[#d49b38] text-[#12242e] flex items-center justify-center font-bold text-xl shadow-xs">
             🐌
           </div>
           <div>
-            <h2 className="font-nautical font-bold text-lg text-amber-300">
+            <h2 className="font-serif font-extrabold text-lg text-[#172b31]">
               Connect 3D Den Den Mushi to Any Site
             </h2>
-            <p className="text-xs text-slate-400">
-              Copy code snippets below to embed Mushi #{config.seed} into external web applications.
+            <p className="text-xs text-[#52636a] font-mono">
+              Copy code snippets below to embed Transponder Snail #{config.seed} into external web applications.
             </p>
           </div>
         </div>
 
         {/* IFRAME EMBED */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-amber-400">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold text-[#172b31] font-mono">
             <span className="flex items-center gap-1.5">
-              <Globe className="w-4 h-4" /> 1. Standard HTML iFrame Embed
+              <Globe className="w-4 h-4 text-[#b8860b]" /> 1. Standard HTML iFrame Embed
             </span>
             <button
               onClick={() => copyToClipboard(iframeSnippet, 'iframe')}
-              className="text-amber-300 hover:text-amber-200 flex items-center gap-1 cursor-pointer bg-slate-800 px-2.5 py-1 rounded-lg border border-amber-500/30"
+              className="text-[#12242e] hover:bg-[#c08828] flex items-center gap-1 cursor-pointer bg-[#d49b38] px-2.5 py-1 rounded text-xs font-bold border border-[#a67520] shadow-2xs"
             >
-              {copiedType === 'iframe' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedType === 'iframe' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedType === 'iframe' ? 'Copied!' : 'Copy Code'}</span>
             </button>
           </div>
-          <pre className="bg-slate-950 text-slate-300 p-3 rounded-xl text-xs font-mono overflow-x-auto border border-slate-800">
+          <pre className="bg-[#102430] text-[#f4ead5] p-3 rounded text-xs font-mono overflow-x-auto border border-[#c8aa6d]/50 shadow-inner">
             {iframeSnippet}
           </pre>
         </div>
 
         {/* WEB COMPONENT */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-amber-400">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold text-[#172b31] font-mono">
             <span className="flex items-center gap-1.5">
-              <Code className="w-4 h-4" /> 2. Custom Web Component (&lt;den-den-mushi&gt;)
+              <Code className="w-4 h-4 text-[#b8860b]" /> 2. Custom Web Component (&lt;den-den-mushi&gt;)
             </span>
             <button
               onClick={() => copyToClipboard(webComponentSnippet, 'webcomponent')}
-              className="text-amber-300 hover:text-amber-200 flex items-center gap-1 cursor-pointer bg-slate-800 px-2.5 py-1 rounded-lg border border-amber-500/30"
+              className="text-[#12242e] hover:bg-[#c08828] flex items-center gap-1 cursor-pointer bg-[#d49b38] px-2.5 py-1 rounded text-xs font-bold border border-[#a67520] shadow-2xs"
             >
-              {copiedType === 'webcomponent' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedType === 'webcomponent' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedType === 'webcomponent' ? 'Copied!' : 'Copy Code'}</span>
             </button>
           </div>
-          <pre className="bg-slate-950 text-slate-300 p-3 rounded-xl text-xs font-mono overflow-x-auto border border-slate-800">
+          <pre className="bg-[#102430] text-[#f4ead5] p-3 rounded text-xs font-mono overflow-x-auto border border-[#c8aa6d]/50 shadow-inner">
             {webComponentSnippet}
           </pre>
         </div>
 
         {/* REACT COMPONENT */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-amber-400">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold text-[#172b31] font-mono">
             <span className="flex items-center gap-1.5">
-              <Layers className="w-4 h-4" /> 3. React / Next.js Component Import
+              <Layers className="w-4 h-4 text-[#b8860b]" /> 3. React / Next.js Component Import
             </span>
             <button
               onClick={() => copyToClipboard(reactSnippet, 'react')}
-              className="text-amber-300 hover:text-amber-200 flex items-center gap-1 cursor-pointer bg-slate-800 px-2.5 py-1 rounded-lg border border-amber-500/30"
+              className="text-[#12242e] hover:bg-[#c08828] flex items-center gap-1 cursor-pointer bg-[#d49b38] px-2.5 py-1 rounded text-xs font-bold border border-[#a67520] shadow-2xs"
             >
-              {copiedType === 'react' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedType === 'react' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedType === 'react' ? 'Copied!' : 'Copy Code'}</span>
             </button>
           </div>
-          <pre className="bg-slate-950 text-slate-300 p-3 rounded-xl text-xs font-mono overflow-x-auto border border-slate-800">
+          <pre className="bg-[#102430] text-[#f4ead5] p-3 rounded text-xs font-mono overflow-x-auto border border-[#c8aa6d]/50 shadow-inner">
             {reactSnippet}
           </pre>
         </div>
@@ -134,7 +134,7 @@ export default function MySite() {
         <div className="pt-2 text-right">
           <button
             onClick={onClose}
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs sm:text-sm cursor-pointer"
+            className="bg-[#ebdcc4] hover:bg-[#dfcdb2] text-[#172b31] font-bold px-4 py-1.5 rounded border border-[#c9aa6d] text-xs cursor-pointer"
           >
             Close Modal
           </button>

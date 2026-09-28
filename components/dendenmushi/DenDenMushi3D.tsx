@@ -132,7 +132,7 @@ export const DenDenMushi3D: React.FC<Props> = ({
   }, [config.face.eyebrowAngle, expression]);
 
   return (
-    <group ref={groupRef} position={[0, -0.6, 0]} scale={config.body.bodyScale}>
+    <group ref={groupRef} position={[0, -0.28, -0.1]} scale={config.body.bodyScale}>
       {/* 🐌 HD SCULPTED SNAIL FOOT & BODY */}
       <group>
         {/* Main Foot Capsule */}

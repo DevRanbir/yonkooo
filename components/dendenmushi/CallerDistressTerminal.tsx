@@ -18,7 +18,8 @@ import {
   Code,
   FileText,
   Radio,
-  UserCheck
+  UserCheck,
+  Trash2
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
@@ -36,6 +37,14 @@ import { soundEngine } from '@/lib/dendenmushi/soundEngine';
 import { MushiBrain } from '@/lib/dendenmushi/aiBrain';
 import { networkSync } from '@/lib/dendenmushi/networkSync';
 import { faceTracker } from '@/lib/dendenmushi/faceTracker';
+import {
+  subscribeFirebaseChat,
+  sendFirebaseChatMessage,
+  clearFirebaseChat,
+  createFirebaseDistressCall,
+  subscribeFirebaseDispatches
+} from '@/lib/dendenmushi/firebaseChat';
+import { Emergency } from '@/lib/types';
 
 const DenDenMushiCanvas = dynamic(
   () => import('./DenDenMushiCanvas').then((mod) => mod.DenDenMushiCanvas),
@@ -105,7 +114,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({
   const [trackingCoords, setTrackingCoords] = useState<{ x: number; y: number } | null>(null);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'customizer' | 'hq'>('chat');
-  const [hqSessions, setHqSessions] = useState<SosSession[]>([]);
+  const [liveDispatches, setLiveDispatches] = useState<Emergency[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const aiBrain = useRef<MushiBrain>(new MushiBrain(config));
@@ -127,11 +136,26 @@ export const CallerDistressTerminal: React.FC<Props> = ({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 1. Subscribe to Firebase 3D Chat in real-time
   useEffect(() => {
-    setHqSessions(networkSync.getActiveSessions());
-    const unsubscribe = networkSync.subscribe((event) => {
-      setHqSessions(networkSync.getActiveSessions());
+    const unsubChat = subscribeFirebaseChat((firebaseMsgs) => {
+      setMessages(firebaseMsgs);
+    });
 
+    // 2. Subscribe to Firebase Dispatches for HQ Radar
+    const unsubDispatches = subscribeFirebaseDispatches((dispatches) => {
+      setLiveDispatches(dispatches);
+    });
+
+    return () => {
+      unsubChat();
+      unsubDispatches();
+    };
+  }, []);
+
+  // 3. Network Sync Listener for multi-window communication
+  useEffect(() => {
+    const unsubscribe = networkSync.subscribe(async (event) => {
       if (event.type === 'HQ_ANSWER_CALL' && session && event.payload.sessionId === session.sessionId) {
         setCallStatus('connected');
         setMushiState('listening');
@@ -139,35 +163,78 @@ export const CallerDistressTerminal: React.FC<Props> = ({
         soundEngine.playGachal();
 
         const hqMsgText = "Purupurupuru... Chopper's Armada HQ Operator receiving transmission! State your emergency, caller!";
-        addMessage('mushi', hqMsgText);
+        await sendFirebaseChatMessage({
+          sender: 'mushi',
+          text: hqMsgText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          mushiName: config.name
+        }).catch(console.error);
         soundEngine.speak(hqMsgText, config.voice.pitch, config.voice.rate);
       }
 
       if (event.type === 'HQ_OPERATOR_MESSAGE' && session && event.payload.sessionId === session.sessionId) {
-        addMessage('operator', event.payload.text);
+        await sendFirebaseChatMessage({
+          sender: 'operator',
+          text: event.payload.text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }).catch(console.error);
         soundEngine.speak(event.payload.text, 0.9, 1.0);
       }
     });
     return () => {
       unsubscribe();
     };
-  }, [session]);
+  }, [session, config]);
 
-  const handleSendDistressSignal = () => {
+  const handleSendDistressSignal = async () => {
     soundEngine.startPurupuru();
     setCallStatus('calling');
     setMushiState('connecting');
 
-    const newSessionId = `SOS-${Math.floor(Math.random() * 899999 + 100000).toString(16).toUpperCase()}`;
-    const callerId = `CALLER-${Math.floor(Math.random() * 8999 + 1000)}`;
+    const newSessionId = `SOS-${Math.floor(1000 + Math.random() * 9000)}`;
+    const callerId = `CALLER-${config.name}`;
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const regionToIslandMap: Record<string, string> = {
+      east_blue: 'Loguetown',
+      marine: 'Marineford',
+      pirate: 'Sabaody Archipelago',
+      wano: 'Wano Country',
+      water_7: 'Water 7',
+      royal: 'Alabasta',
+      cp0: 'Enies Lobby',
+      golden_buster: 'Buster Call Sector'
+    };
+
+    const targetIsland = regionToIslandMap[config.region] || 'Water 7';
+
+    // 1. Write distress record to Firebase Realtime Database
+    await createFirebaseDistressCall({
+      id: newSessionId,
+      type: 'Den Den Mushi Distress Call',
+      island: targetIsland,
+      sector: 'Harbor District - Channel 07',
+      severity: 'critical',
+      description: `Emergency transponder transmission initiated via Den Den Mushi (${config.name}). Channel 07 live audio link.`,
+      callerName: callerId,
+      denDenFrequency: '108.4 MHz'
+    }).catch(console.error);
+
+    // 2. Post alert message to Firebase Chat
+    await sendFirebaseChatMessage({
+      sender: 'system',
+      text: `🚨 SOS EMERGENCY SIGNAL INITIATED ON ${targetIsland.toUpperCase()} · FREQ 07 LIVE`,
+      timestamp,
+      sosAlert: true
+    }).catch(console.error);
 
     const newSession: SosSession = {
       sessionId: newSessionId,
       callerId,
       callerRole: 'Civilian',
       status: 'CONNECTING',
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      locationName: 'Water 7 Harbor District',
+      createdAt: timestamp,
+      locationName: targetIsland,
       coordinates: "34°12'N, 142°05'E",
       incidentType: 'Ship Attack & Injuries',
       injuredCount: 2,
@@ -175,26 +242,28 @@ export const CallerDistressTerminal: React.FC<Props> = ({
       severity: 'code_red',
       channel: '07',
       recordingEvents: [
-        { timestamp: new Date().toLocaleTimeString(), sender: 'SYSTEM', text: 'SOS EMERGENCY SIGNAL INITIATED', eventType: 'CALL_STARTED' }
+        { timestamp, sender: 'SYSTEM', text: 'SOS EMERGENCY SIGNAL INITIATED', eventType: 'CALL_STARTED' }
       ]
     };
 
     setSession(newSession);
 
-    // Save & Broadcast to HQ real-time network
-    const active = networkSync.getActiveSessions();
-    networkSync.saveActiveSessions([newSession, ...active]);
-    networkSync.broadcast('NEW_SOS_SESSION', newSession);
-
     // Auto-answer simulation after 2.2 seconds if HQ is unmanned
-    setTimeout(() => {
+    setTimeout(async () => {
       setCallStatus('connected');
       setMushiState('listening');
       soundEngine.stopPurupuru();
       soundEngine.playGachal();
 
       const greeting = `Purupurupuru... Den Den Mushi emergency channel 07 connected! This is ${config.name} at Armada HQ! Identify yourself and state your emergency!`;
-      addMessage('mushi', greeting);
+      const gTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      await sendFirebaseChatMessage({
+        sender: 'mushi',
+        text: greeting,
+        timestamp: gTimestamp,
+        mushiName: config.name
+      }).catch(console.error);
 
       soundEngine.speak(greeting, config.voice.pitch, config.voice.rate);
     }, 2200);
@@ -204,11 +273,19 @@ export const CallerDistressTerminal: React.FC<Props> = ({
     if (!userText.trim()) return;
 
     soundEngine.playAlertTone();
-    addMessage('user', userText);
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // 1. Write user message directly to Firebase Realtime Database
+    await sendFirebaseChatMessage({
+      sender: 'user',
+      text: userText,
+      timestamp
+    }).catch(console.error);
+
     setInputText('');
     setMushiState('listening');
 
-    // Process through Sarvam AI Brain
+    // 2. Process through Sarvam AI Brain
     const callStateObj = { status: 'connected', isSosActive: true };
     const aiResult = await aiBrain.current.processInputAsync(userText, callStateObj as any);
 
@@ -221,19 +298,16 @@ export const CallerDistressTerminal: React.FC<Props> = ({
       setMushiState('speaking');
     }
 
-    addMessage('mushi', aiResult.response, aiResult.expression, aiResult.sosTriggered);
-
-    // Sync transcript & audio recording event to HQ
-    if (session) {
-      const updatedEvents = [
-        ...session.recordingEvents,
-        { timestamp: new Date().toLocaleTimeString(), sender: 'CALLER', text: userText },
-        { timestamp: new Date().toLocaleTimeString(), sender: config.name, text: aiResult.response }
-      ];
-      const updatedSession = { ...session, recordingEvents: updatedEvents };
-      setSession(updatedSession);
-      networkSync.broadcast('UPDATE_TRANSCRIPT', updatedSession);
-    }
+    // 3. Write Mushi AI response directly to Firebase Realtime Database
+    const replyTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    await sendFirebaseChatMessage({
+      sender: 'mushi',
+      text: aiResult.response,
+      timestamp: replyTimestamp,
+      expression: aiResult.expression,
+      sosAlert: aiResult.sosTriggered,
+      mushiName: config.name
+    }).catch(console.error);
 
     soundEngine.speak(
       aiResult.response,
@@ -244,18 +318,10 @@ export const CallerDistressTerminal: React.FC<Props> = ({
     );
   };
 
-  const addMessage = (sender: 'user' | 'mushi' | 'operator', text: string, expression?: any, sosAlert?: boolean) => {
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const msg: ChatMessage = {
-      id: Date.now().toString(),
-      sender,
-      text,
-      timestamp,
-      expression,
-      sosAlert,
-      mushiName: config.name
-    };
-    setMessages((prev) => [...prev, msg]);
+  const handleClearChat = async () => {
+    if (typeof window !== 'undefined' && window.confirm("Purge Channel 07 chat history from Firebase?")) {
+      await clearFirebaseChat().catch(console.error);
+    }
   };
 
   const handleHangUp = () => {
@@ -352,30 +418,30 @@ export const CallerDistressTerminal: React.FC<Props> = ({
   };
 
   return (
-    <div className="w-full h-full grid grid-cols-1 md:grid-cols-12 gap-2.5 items-stretch min-h-0 select-none">
+    <div className="w-full h-full grid grid-cols-1 md:grid-cols-12 gap-3 items-stretch min-h-0 select-none">
       {/* 🐌 LEFT COLUMN: Interactive 3D Den Den Mushi Viewport */}
-      <div className="md:col-span-6 lg:col-span-7 h-full flex flex-col relative rounded-md overflow-hidden border border-[#e8bd6144] bg-[#071926]/90 backdrop-blur-md shadow-2xl min-h-0">
+      <div className="md:col-span-6 lg:col-span-7 h-full flex flex-col relative rounded-lg overflow-hidden border-2 border-[#b8860b]/60 bg-transparent min-h-0">
         {/* Floating Top HUD Strip */}
         <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none z-20 gap-2">
           {/* Status & Channel */}
-          <div className="pointer-events-auto flex items-center gap-1.5 px-2 py-1 rounded bg-[#071926]/90 border border-[#e8bd6144] text-[10px] font-mono text-[#f4ead5] shadow-md backdrop-blur-xs">
-            <span className="w-2 h-2 rounded-full bg-[#6ab897] animate-pulse" />
-            <span className="font-bold text-[#e8bd61]">FREQ 07</span>
-            <span className="text-[#a8bbc0] hidden sm:inline">· {session ? session.sessionId : 'STANDBY'}</span>
+          <div className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#fcf8f0]/95 border border-[#b8860b]/60 text-[10px] font-mono text-[#172b31] shadow-xs backdrop-blur-xs">
+            <span className="w-2 h-2 rounded-full bg-[#2e7d5a] animate-pulse" />
+            <span className="font-extrabold text-[#b8860b]">FREQ 07</span>
+            <span className="text-[#52636a] hidden sm:inline">· {session ? session.sessionId : 'STANDBY'}</span>
           </div>
 
           {/* Top Quick Actions */}
-          <div className="pointer-events-auto flex items-center gap-1">
+          <div className="pointer-events-auto flex items-center gap-1.5">
             {/* Region Selector Dropdown */}
             {onSelectRegion && (
               <select
                 value={config.region}
                 onChange={(e) => onSelectRegion(e.target.value as RegionTheme)}
-                className="bg-[#071926]/90 border border-[#e8bd6144] text-[#e8bd61] rounded px-1.5 py-1 text-[10px] font-mono font-bold cursor-pointer focus:outline-none"
+                className="bg-[#fcf8f0]/95 border border-[#b8860b]/60 text-[#172b31] rounded px-2 py-1 text-[10px] font-mono font-bold cursor-pointer focus:outline-none hover:border-[#b8860b] shadow-xs"
                 aria-label="Select Region"
               >
                 {REGION_LIST.map((r) => (
-                  <option key={r.id} value={r.id} className="bg-[#071926] text-[#f4ead5]">
+                  <option key={r.id} value={r.id} className="bg-[#fcf8f0] text-[#172b31]">
                     {r.name}
                   </option>
                 ))}
@@ -388,8 +454,8 @@ export const CallerDistressTerminal: React.FC<Props> = ({
               onClick={toggleCameraTracking}
               className={`p-1.5 rounded border text-[10px] font-mono transition cursor-pointer flex items-center gap-1 ${
                 isCameraTracking
-                  ? 'bg-[#6ab897] text-[#071926] border-[#6ab897] font-bold'
-                  : 'bg-[#071926]/90 text-[#a8bbc0] border-[#e8bd6144] hover:text-[#f4ead5]'
+                  ? 'bg-[#d49b38] text-[#10242f] border-[#d49b38] font-bold shadow-xs'
+                  : 'bg-[#fcf8f0]/95 text-[#172b31] border-[#b8860b]/60 hover:text-[#b8860b]'
               }`}
               title={isCameraTracking ? 'Face Tracking Active' : 'Switch to Camera Face Tracking'}
             >
@@ -402,7 +468,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={onToggleMute}
-                className="p-1.5 rounded border border-[#e8bd6144] bg-[#071926]/90 text-[#e8bd61] hover:text-white transition cursor-pointer"
+                className="p-1.5 rounded border border-[#b8860b]/60 bg-[#fcf8f0]/95 text-[#172b31] hover:text-[#b8860b] transition cursor-pointer shadow-xs"
                 title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
               >
                 {isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
@@ -425,15 +491,15 @@ export const CallerDistressTerminal: React.FC<Props> = ({
         {/* Floating Bottom HUD Strip */}
         <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none z-20 gap-2">
           {/* Emotion Badge */}
-          <div className="pointer-events-auto flex items-center gap-1 px-2 py-1 rounded bg-[#071926]/90 border border-[#e8bd6144] text-[10px] font-mono text-[#e8bd61] shadow-md backdrop-blur-xs">
-            <span className="text-[#a8bbc0]">EMOTION:</span>
-            <span className="font-bold text-[#6ab897] uppercase">{mushiState.replace('_', ' ')}</span>
+          <div className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#fcf8f0]/95 border border-[#b8860b]/60 text-[10px] font-mono text-[#172b31] shadow-xs backdrop-blur-xs">
+            <span className="text-[#52636a] font-bold">EMOTION:</span>
+            <span className="font-extrabold text-[#2e7d5a] uppercase">{mushiState.replace('_', ' ')}</span>
           </div>
 
           {/* Primary SOS Action Button */}
-          <div className="pointer-events-auto flex items-center gap-1.5">
+          <div className="pointer-events-auto flex items-center gap-2">
             {session && (
-              <div className="bg-[#b93b32] text-white px-2 py-1 rounded text-[10px] font-mono font-bold flex items-center gap-1 animate-pulse shadow-md">
+              <div className="bg-[#bd3c32] text-white px-2 py-1 rounded text-[10px] font-mono font-bold flex items-center gap-1 animate-pulse shadow-md">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
                 <span>REC LIVE</span>
               </div>
@@ -443,18 +509,18 @@ export const CallerDistressTerminal: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={handleSendDistressSignal}
-                className="bg-[#bd3c32] hover:bg-[#932d27] text-[#fff7df] font-mono font-bold px-3 py-1.5 rounded text-[11px] flex items-center gap-1.5 border border-[#e56659] cursor-pointer shadow-lg animate-pulse transition"
+                className="bg-gradient-to-b from-[#bd3c32] to-[#8c221b] hover:from-[#cf3f34] hover:to-[#9c2720] text-[#fff7df] font-mono font-extrabold px-3.5 py-1.5 rounded-md text-[11px] flex items-center gap-1.5 border border-[#f0857a]/70 cursor-pointer shadow-[0_4px_12px_rgba(189,60,50,0.5)] active:translate-y-0.5 transition uppercase tracking-wider"
               >
-                <Phone size={12} />
+                <Phone size={13} />
                 <span>DIAL DISTRESS CALL</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleHangUp}
-                className="bg-[#bd3c32] hover:bg-[#932d27] text-[#fff7df] font-mono font-bold px-3 py-1.5 rounded text-[11px] flex items-center gap-1.5 border border-[#e56659] cursor-pointer shadow-lg transition"
+                className="bg-gradient-to-b from-[#8c221b] to-[#601510] hover:from-[#9c2720] hover:to-[#701813] text-[#fff7df] font-mono font-extrabold px-3.5 py-1.5 rounded-md text-[11px] flex items-center gap-1.5 border border-[#f0857a]/70 cursor-pointer shadow-[0_4px_12px_rgba(189,60,50,0.5)] transition uppercase tracking-wider"
               >
-                <PhoneOff size={12} />
+                <PhoneOff size={13} />
                 <span>END CALL</span>
               </button>
             )}
@@ -463,57 +529,57 @@ export const CallerDistressTerminal: React.FC<Props> = ({
 
         {/* Face Tracking Camera Preview Mini-PIP */}
         {isCameraTracking && (
-          <div className="absolute top-10 right-2 bg-[#071926]/95 border border-[#6ab897] p-1 rounded z-30 flex flex-col items-center shadow-xl">
-            <div ref={cameraPreviewRef} className="w-20 h-14 bg-black rounded overflow-hidden border border-[#6ab897]/50 relative">
-              <div className={`absolute inset-0 border ${isFaceDetected ? 'border-[#6ab897] animate-pulse' : 'border-[#e8bd61]/40'} m-1 rounded pointer-events-none flex items-center justify-center`}>
-                <div className={`w-1 h-1 rounded-full ${isFaceDetected ? 'bg-[#6ab897]' : 'bg-[#e8bd61]'}`} />
+          <div className="absolute top-11 right-2 bg-[#071926]/95 border border-[#d4af37] p-1 rounded z-30 flex flex-col items-center shadow-xl">
+            <div ref={cameraPreviewRef} className="w-20 h-14 bg-black rounded overflow-hidden border border-[#d4af37]/50 relative">
+              <div className={`absolute inset-0 border ${isFaceDetected ? 'border-[#4ade80] animate-pulse' : 'border-[#e8bd61]/40'} m-1 rounded pointer-events-none flex items-center justify-center`}>
+                <div className={`w-1 h-1 rounded-full ${isFaceDetected ? 'bg-[#4ade80]' : 'bg-[#e8bd61]'}`} />
               </div>
             </div>
-            <span className="text-[8px] font-mono font-bold mt-0.5 text-[#6ab897]">
+            <span className="text-[8px] font-mono font-bold mt-0.5 text-[#4ade80]">
               {isFaceDetected ? '● LOCKED' : 'SCANNING'}
             </span>
           </div>
         )}
       </div>
 
-      {/* 🎛️ RIGHT COLUMN: Tabbed Console (Chat | Customizer | Fleet HQ) */}
-      <div className="md:col-span-6 lg:col-span-5 h-full flex flex-col rounded-md overflow-hidden border border-[#e8bd6144] bg-[#071926]/90 backdrop-blur-md shadow-2xl min-h-0">
+      {/* 🎛️ RIGHT COLUMN: Parchment Command Ledger (Chat | Customizer | Fleet HQ) */}
+      <div className="md:col-span-6 lg:col-span-5 h-full flex flex-col rounded-lg overflow-hidden border-2 border-[#b8860b]/60 shadow-[0_10px_30px_rgba(8,18,25,0.45)] bg-[#fcf8f0]/95 backdrop-blur-md min-h-0">
         {/* Tab Switcher Header */}
-        <div className="flex items-center gap-1 p-1 bg-[#04121b]/80 border-b border-[#e8bd6133] shrink-0 text-xs font-mono">
+        <div className="flex items-center gap-1.5 p-1.5 bg-[#eae0cd] border-b border-[#c8aa6d]/70 shrink-0 text-xs font-mono">
           <button
             type="button"
             onClick={() => setActiveTab('chat')}
-            className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 font-bold text-[11px] transition cursor-pointer ${
+            className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1 text-[11px] transition cursor-pointer ${
               activeTab === 'chat'
-                ? 'bg-[#e8bd61] text-[#071926]'
-                : 'text-[#a8bbc0] hover:text-[#f4ead5]'
+                ? 'bg-[#d49b38] text-[#12242e] font-extrabold shadow-xs border border-[#a67520]'
+                : 'bg-[#ded2ba]/80 text-[#4c5b62] hover:text-[#172b31] hover:bg-[#e6dac0] font-bold border border-transparent'
             }`}
           >
-            <MessageSquare size={11} />
+            <MessageSquare size={12} />
             <span>Voice &amp; Chat</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('customizer')}
-            className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 font-bold text-[11px] transition cursor-pointer ${
+            className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1 text-[11px] transition cursor-pointer ${
               activeTab === 'customizer'
-                ? 'bg-[#e8bd61] text-[#071926]'
-                : 'text-[#a8bbc0] hover:text-[#f4ead5]'
+                ? 'bg-[#d49b38] text-[#12242e] font-extrabold shadow-xs border border-[#a67520]'
+                : 'bg-[#ded2ba]/80 text-[#4c5b62] hover:text-[#172b31] hover:bg-[#e6dac0] font-bold border border-transparent'
             }`}
           >
-            <Palette size={11} />
+            <Palette size={12} />
             <span>Snail Traits</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('hq')}
-            className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 font-bold text-[11px] transition cursor-pointer ${
+            className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1 text-[11px] transition cursor-pointer ${
               activeTab === 'hq'
-                ? 'bg-[#6ab897] text-[#071926]'
-                : 'text-[#a8bbc0] hover:text-[#f4ead5]'
+                ? 'bg-[#2e7d5a] text-[#ffffff] font-extrabold shadow-xs border border-[#1b5e3f]'
+                : 'bg-[#ded2ba]/80 text-[#4c5b62] hover:text-[#172b31] hover:bg-[#e6dac0] font-bold border border-transparent'
             }`}
           >
-            <ShieldAlert size={11} />
+            <ShieldAlert size={12} />
             <span>HQ Radar</span>
           </button>
         </div>
@@ -521,16 +587,38 @@ export const CallerDistressTerminal: React.FC<Props> = ({
         {/* TAB 1: Live Voice & Chat */}
         {activeTab === 'chat' && (
           <div className="flex-1 flex flex-col min-h-0 p-2.5">
+            {/* Live Firebase Chat Status Strip */}
+            <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#c8aa6d]/50 text-[10px] font-mono text-[#55656d]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse" />
+                <span className="font-extrabold text-[#172b31]">FIREBASE RTDB CHAT</span>
+                <span className="text-[#8c9ba1]">· FREQ 07</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] text-[#8c9ba1] font-bold">{messages.length} MSGS</span>
+                {messages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearChat}
+                    title="Clear Firebase Chat History"
+                    className="p-1 rounded text-[#8c9ba1] hover:text-[#bd3c32] hover:bg-[#ebdcc4] transition cursor-pointer"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Transcript Feed */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 text-xs">
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center p-4 text-center border border-dashed border-[#e8bd6133] rounded bg-[#04121b]/50 text-[#a8bbc0] space-y-2">
+                <div className="h-full flex flex-col items-center justify-center p-4 text-center border-2 border-dashed border-[#c8aa6d]/60 rounded-md bg-[#f4ebd8]/70 text-[#55656d] space-y-2">
                   <span className="text-2xl">🐌</span>
-                  <p className="font-mono text-[11px]">
-                    Channel 07 Standby. Click <span className="text-[#e56659] font-bold">&quot;DIAL DISTRESS CALL&quot;</span> or type below to transmit distress signals!
+                  <p className="font-mono text-[11px] text-[#2c3d44] font-semibold">
+                    Channel 07 Standby on Firebase. Click <span className="text-[#bd3c32] font-extrabold">&quot;DIAL DISTRESS CALL&quot;</span> or speak to transmit distress signals!
                   </p>
-                  <p className="text-[10px] text-[#6ab897]">
-                    Speech synthesis &amp; real-time voice AI active.
+                  <p className="text-[10px] text-[#2e7d5a] font-bold">
+                    Connected to Firebase Realtime Database &amp; Sarvam Voice AI.
                   </p>
                 </div>
               ) : (
@@ -539,7 +627,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                     key={msg.id}
                     className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
                   >
-                    <div className="flex items-center gap-1 mb-0.5 text-[9px] font-mono text-[#a8bbc0]">
+                    <div className="flex items-center gap-1 mb-0.5 text-[9px] font-mono text-[#62737c]">
                       <span>
                         {msg.sender === 'user'
                           ? '👤 YOU'
@@ -551,12 +639,12 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                       <span>{msg.timestamp}</span>
                     </div>
                     <div
-                      className={`max-w-[88%] px-2.5 py-1.5 rounded text-[11px] leading-relaxed shadow-xs ${
+                      className={`max-w-[88%] px-3 py-1.5 rounded-md text-[11.5px] leading-relaxed shadow-2xs ${
                         msg.sender === 'user'
-                          ? 'bg-[#e8bd61] text-[#071926] font-semibold'
+                          ? 'bg-[#163344] text-[#fbf5e6] font-semibold border border-[#d4af37]/60'
                           : msg.sender === 'operator'
-                          ? 'bg-[#6ab897] text-[#071926] font-semibold'
-                          : 'bg-[#0d2b3d] border border-[#e8bd6144] text-[#f4ead5]'
+                          ? 'bg-[#1f5642] text-[#fbf5e6] font-semibold border border-[#5ab38e]/60'
+                          : 'bg-[#ffffff] text-[#172b31] border border-[#d4c19a]'
                       }`}
                     >
                       {msg.text}
@@ -569,12 +657,12 @@ export const CallerDistressTerminal: React.FC<Props> = ({
 
             {/* Audio Wave Indicator when Snail Speaks */}
             {isSpeaking && (
-              <div className="py-1 px-2 mb-1 bg-[#6ab897]/20 border border-[#6ab897]/50 rounded flex items-center justify-between text-[10px] font-mono text-[#6ab897] animate-pulse">
+              <div className="py-1 px-2.5 mb-1 bg-[#2e7d5a]/15 border border-[#2e7d5a]/40 rounded flex items-center justify-between text-[10px] font-mono text-[#1b5e3f] font-bold animate-pulse">
                 <span>🔊 SYNTHESIZING VOICE PLAYBACK...</span>
                 <span className="flex items-center gap-0.5">
-                  <span className="w-1 h-2 bg-[#6ab897] animate-bounce" />
-                  <span className="w-1 h-3 bg-[#6ab897] animate-bounce delay-75" />
-                  <span className="w-1 h-1 bg-[#6ab897] animate-bounce delay-150" />
+                  <span className="w-1 h-2 bg-[#2e7d5a] animate-bounce" />
+                  <span className="w-1 h-3 bg-[#2e7d5a] animate-bounce delay-75" />
+                  <span className="w-1 h-1 bg-[#2e7d5a] animate-bounce delay-150" />
                 </span>
               </div>
             )}
@@ -585,22 +673,22 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                 e.preventDefault();
                 if (inputText.trim()) handleSendMessage(inputText);
               }}
-              className="flex items-center gap-1.5 pt-2 border-t border-[#e8bd6133] shrink-0"
+              className="flex items-center gap-1.5 pt-2 border-t border-[#c8aa6d]/60 shrink-0"
             >
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder={isListening ? 'Listening dictation...' : 'Type distress message...'}
-                className="flex-1 bg-[#04121b] text-[#f4ead5] placeholder-[#a8bbc0] border border-[#e8bd6144] rounded px-2.5 py-1.5 text-xs font-sans focus:outline-none focus:border-[#e8bd61]"
+                className="flex-1 bg-[#ffffff] text-[#172b31] placeholder-[#7d8c93] border-1.5 border-[#c9aa6d] rounded px-3 py-1.5 text-xs font-sans focus:outline-none focus:border-[#b8860b] focus:ring-1 focus:ring-[#b8860b]/40 shadow-inner"
               />
               <button
                 type="button"
                 onClick={handleToggleMic}
                 className={`p-1.5 rounded border transition cursor-pointer shrink-0 ${
                   isListening
-                    ? 'bg-[#b93b32] text-white animate-pulse border-[#e56659]'
-                    : 'bg-[#04121b] text-[#e8bd61] border-[#e8bd6144] hover:bg-[#0d2b3d]'
+                    ? 'bg-[#bd3c32] text-white animate-pulse border-[#e56659]'
+                    : 'bg-[#ebdcc4] text-[#172b31] border-[#c9aa6d] hover:bg-[#dfcdb2]'
                 }`}
                 title={isListening ? 'Stop Mic Dictation' : 'Speak via Microphone'}
               >
@@ -609,7 +697,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({
               <button
                 type="submit"
                 disabled={!inputText.trim()}
-                className="bg-[#e8bd61] hover:bg-[#f0c65d] disabled:opacity-40 text-[#071926] font-mono font-bold px-3 py-1.5 rounded text-xs transition flex items-center gap-1 cursor-pointer shrink-0"
+                className="bg-[#d49b38] hover:bg-[#c08828] disabled:opacity-40 text-[#12242e] font-mono font-extrabold px-3 py-1.5 rounded text-xs transition flex items-center gap-1 cursor-pointer shrink-0 border border-[#a67520] shadow-2xs"
               >
                 <Send size={12} />
               </button>
@@ -619,20 +707,20 @@ export const CallerDistressTerminal: React.FC<Props> = ({
 
         {/* TAB 2: Snail Trait Customizer */}
         {activeTab === 'customizer' && (
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-3 min-h-0 text-xs font-mono">
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-3 min-h-0 text-xs font-mono text-[#172b31]">
             {/* Header + Randomizer */}
-            <div className="flex items-center justify-between pb-1.5 border-b border-[#e8bd6133]">
+            <div className="flex items-center justify-between pb-1.5 border-b border-[#c8aa6d]/60">
               <div>
-                <span className="font-bold text-[#e8bd61] flex items-center gap-1 text-[11px]">
-                  <Sparkles size={11} className="text-[#6ab897]" />
+                <span className="font-extrabold text-[#172b31] flex items-center gap-1 text-[11px]">
+                  <Sparkles size={11} className="text-[#d49b38]" />
                   TRAIT CUSTOMIZER
                 </span>
-                <span className="text-[10px] text-[#a8bbc0]">Live 3D snail updates</span>
+                <span className="text-[10px] text-[#5c6e76]">Live 3D snail updates</span>
               </div>
               <button
                 type="button"
                 onClick={handleRandomize}
-                className="bg-[#e8bd61] hover:bg-[#f0c65d] text-[#071926] font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1 cursor-pointer transition"
+                className="bg-[#d49b38] hover:bg-[#c08828] text-[#12242e] font-extrabold px-2.5 py-1 rounded text-[10px] flex items-center gap-1 cursor-pointer transition border border-[#a67520] shadow-2xs"
               >
                 <Dices size={11} />
                 <span>RANDOMIZE</span>
@@ -641,8 +729,8 @@ export const CallerDistressTerminal: React.FC<Props> = ({
 
             {/* 3D Model Mode Toggle */}
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-[#e8bd61] flex items-center gap-1 uppercase">
-                <Box size={10} /> 3D Model Engine
+              <label className="text-[10px] font-extrabold text-[#172b31] flex items-center gap-1 uppercase tracking-wider">
+                <Box size={10} className="text-[#b8860b]" /> 3D Model Engine
               </label>
               <div className="grid grid-cols-3 gap-1">
                 <button
@@ -650,8 +738,8 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                   onClick={() => onConfigChange && onConfigChange({ ...config, modelMode: 'procedural' })}
                   className={`py-1 px-1.5 rounded border text-[10px] font-bold cursor-pointer transition ${
                     config.modelMode === 'procedural'
-                      ? 'bg-[#e8bd61] text-[#071926] border-[#e8bd61]'
-                      : 'bg-[#04121b] text-[#a8bbc0] border-[#e8bd6133] hover:text-[#f4ead5]'
+                      ? 'bg-[#d49b38] text-[#12242e] border-[#a67520] shadow-xs'
+                      : 'bg-[#ebdcc4] text-[#4c5b62] border-[#c9aa6d] hover:text-[#172b31]'
                   }`}
                 >
                   🎨 Procedural
@@ -661,8 +749,8 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                   onClick={() => onConfigChange && onConfigChange({ ...config, modelMode: 'glb_law' })}
                   className={`py-1 px-1.5 rounded border text-[10px] font-bold cursor-pointer transition ${
                     config.modelMode === 'glb_law'
-                      ? 'bg-[#6ab897] text-[#071926] border-[#6ab897]'
-                      : 'bg-[#04121b] text-[#a8bbc0] border-[#e8bd6133] hover:text-[#f4ead5]'
+                      ? 'bg-[#2e7d5a] text-white border-[#1b5e3f] shadow-xs'
+                      : 'bg-[#ebdcc4] text-[#4c5b62] border-[#c9aa6d] hover:text-[#172b31]'
                   }`}
                 >
                   📦 Law 3D GLB
@@ -672,8 +760,8 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                   onClick={() => onConfigChange && onConfigChange({ ...config, modelMode: 'glb_law_hd' })}
                   className={`py-1 px-1.5 rounded border text-[10px] font-bold cursor-pointer transition ${
                     config.modelMode === 'glb_law_hd'
-                      ? 'bg-[#a855f7] text-white border-[#a855f7]'
-                      : 'bg-[#04121b] text-[#a8bbc0] border-[#e8bd6133] hover:text-[#f4ead5]'
+                      ? 'bg-[#8938b8] text-white border-[#6c2894] shadow-xs'
+                      : 'bg-[#ebdcc4] text-[#4c5b62] border-[#c9aa6d] hover:text-[#172b31]'
                   }`}
                 >
                   💎 Law HD
@@ -683,16 +771,16 @@ export const CallerDistressTerminal: React.FC<Props> = ({
 
             {/* Official Character Presets */}
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-[#e8bd61] flex items-center gap-1 uppercase">
-                <UserCheck size={10} /> Character Archetypes
+              <label className="text-[10px] font-extrabold text-[#172b31] flex items-center gap-1 uppercase tracking-wider">
+                <UserCheck size={10} className="text-[#b8860b]" /> Character Archetypes
               </label>
-              <div className="grid grid-cols-2 gap-1 max-h-[140px] overflow-y-auto pr-0.5">
+              <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-0.5">
                 {CHARACTER_BUTTONS.map((char) => (
                   <button
                     key={char.id}
                     type="button"
                     onClick={() => handleSelectPreset(char.id, char.defaultGlb)}
-                    className="p-1.5 rounded bg-[#04121b] hover:bg-[#0d2b3d] border border-[#e8bd6133] hover:border-[#e8bd61] flex items-center gap-1 text-[10px] text-left transition cursor-pointer text-[#f4ead5]"
+                    className="p-1.5 rounded bg-[#f4ebd8] hover:bg-[#ebdcc3] border border-[#c8aa6d]/70 hover:border-[#b8860b] flex items-center gap-1.5 text-[10px] text-left transition cursor-pointer text-[#172b31] font-bold shadow-2xs"
                   >
                     <span>{char.icon}</span>
                     <span className="truncate">{char.label}</span>
@@ -703,12 +791,12 @@ export const CallerDistressTerminal: React.FC<Props> = ({
 
             {/* Quick Color Swatches */}
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-[#e8bd61] flex items-center gap-1 uppercase">
-                <Palette size={10} /> Shell &amp; Body Color
+              <label className="text-[10px] font-extrabold text-[#172b31] flex items-center gap-1 uppercase tracking-wider">
+                <Palette size={10} className="text-[#b8860b]" /> Shell &amp; Body Color
               </label>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4 bg-[#f4ebd8] p-2 rounded border border-[#c8aa6d]/60">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#a8bbc0]">Shell:</span>
+                  <span className="text-[10.5px] font-bold text-[#172b31]">Shell:</span>
                   <input
                     type="color"
                     value={config.shell.primaryColor || '#e8bd61'}
@@ -719,11 +807,11 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                         shell: { ...config.shell, primaryColor: e.target.value }
                       })
                     }
-                    className="w-6 h-6 rounded border border-[#e8bd6144] cursor-pointer bg-transparent"
+                    className="w-6 h-6 rounded border border-[#c8aa6d] cursor-pointer bg-transparent"
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#a8bbc0]">Skin:</span>
+                  <span className="text-[10.5px] font-bold text-[#172b31]">Skin:</span>
                   <input
                     type="color"
                     value={config.body.bodyColor || '#6ab897'}
@@ -734,7 +822,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                         body: { ...config.body, bodyColor: e.target.value }
                       })
                     }
-                    className="w-6 h-6 rounded border border-[#e8bd6144] cursor-pointer bg-transparent"
+                    className="w-6 h-6 rounded border border-[#c8aa6d] cursor-pointer bg-transparent"
                   />
                 </div>
               </div>
@@ -744,34 +832,47 @@ export const CallerDistressTerminal: React.FC<Props> = ({
 
         {/* TAB 3: Armada HQ Radar */}
         {activeTab === 'hq' && (
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-0 text-xs font-mono">
-            <div className="flex items-center justify-between pb-1.5 border-b border-[#e8bd6133]">
-              <span className="font-bold text-[#6ab897] flex items-center gap-1 text-[11px]">
-                <ShieldAlert size={11} />
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-0 text-xs font-mono text-[#172b31]">
+            <div className="flex items-center justify-between pb-1.5 border-b border-[#c8aa6d]/60">
+              <span className="font-extrabold text-[#2e7d5a] flex items-center gap-1 text-[11px]">
+                <ShieldAlert size={12} />
                 FLEET EMERGENCY RADAR
               </span>
-              <span className="text-[10px] text-[#6ab897] font-bold">ONLINE</span>
+              <span className="text-[10px] text-[#2e7d5a] font-extrabold bg-[#2e7d5a]/15 px-2 py-0.5 rounded border border-[#2e7d5a]/30">ONLINE</span>
             </div>
 
-            <p className="text-[10px] text-[#a8bbc0] leading-relaxed">
+            <p className="text-[10.5px] text-[#4c5b62] leading-relaxed">
               Monitoring all Grand Line distress frequencies. Incoming calls automatically populate the triage queue.
             </p>
 
             {/* Active Sessions List */}
             <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-[#e8bd61]">ACTIVE SIGNALS ({hqSessions.length}):</span>
-              {hqSessions.length === 0 ? (
-                <div className="p-2 text-center border border-dashed border-[#e8bd6133] rounded text-[#a8bbc0] text-[10px]">
-                  No active distress calls. Channel 07 clear.
+              <div className="flex items-center justify-between text-[10px] font-extrabold text-[#172b31] uppercase tracking-wider">
+                <span>FIREBASE DISPATCHES ({liveDispatches.length}):</span>
+                <span className="text-[#2e7d5a] font-mono text-[9px] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#2e7d5a] animate-pulse" />
+                  LIVE SYNC
+                </span>
+              </div>
+              {liveDispatches.length === 0 ? (
+                <div className="p-3 text-center border-2 border-dashed border-[#c8aa6d]/60 rounded bg-[#f4ebd8]/70 text-[#55656d] text-[10px] font-semibold">
+                  No active distress calls in Firebase. Channel 07 clear.
                 </div>
               ) : (
-                hqSessions.slice(0, 3).map((s) => (
-                  <div key={s.sessionId} className="p-2 rounded bg-[#04121b] border border-[#e8bd6133] space-y-1 text-[10px]">
+                liveDispatches.slice(0, 5).map((s) => (
+                  <div key={s.id} className="p-2 rounded bg-[#f4ebd8] border border-[#c8aa6d] space-y-1 text-[10px]">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#e8bd61]">{s.sessionId}</span>
-                      <span className="text-[#e56659] font-bold">{s.severity.toUpperCase()}</span>
+                      <span className="font-extrabold text-[#172b31]">{s.id}</span>
+                      <span className={`font-extrabold px-1.5 py-0.5 rounded text-[9px] border ${
+                        s.severity === 'critical' ? 'bg-[#bd3c32]/10 text-[#bd3c32] border-[#bd3c32]/30' :
+                        s.severity === 'high' ? 'bg-[#d49b38]/15 text-[#9e6d16] border-[#d49b38]/30' :
+                        'bg-[#2e7d5a]/10 text-[#2e7d5a] border-[#2e7d5a]/30'
+                      }`}>
+                        {s.severity.toUpperCase()} · {s.status.toUpperCase()}
+                      </span>
                     </div>
-                    <div className="text-[#a8bbc0]">{s.locationName} · {s.incidentType}</div>
+                    <div className="text-[#4c5b62] font-semibold">{s.island} ({s.sector})</div>
+                    <div className="text-[9.5px] text-[#6b7b83] truncate">{s.type} · {s.callerName || 'Unknown Caller'}</div>
                   </div>
                 ))
               )}
@@ -783,9 +884,9 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={onOpenDistressForm}
-                  className="w-full bg-[#bd3c32] hover:bg-[#932d27] text-white font-bold py-1.5 px-2 rounded text-[11px] transition cursor-pointer flex items-center justify-center gap-1"
+                  className="w-full bg-[#bd3c32] hover:bg-[#9e2720] text-white font-extrabold py-2 px-3 rounded text-[11px] transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs uppercase tracking-wider"
                 >
-                  <FileText size={11} />
+                  <FileText size={12} />
                   <span>TRANSMIT SOS LOG FORM</span>
                 </button>
               )}
@@ -794,7 +895,7 @@ export const CallerDistressTerminal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={onOpenEmbed}
-                  className="w-full bg-[#04121b] hover:bg-[#0d2b3d] text-[#e8bd61] border border-[#e8bd6144] font-bold py-1.5 px-2 rounded text-[10px] transition cursor-pointer flex items-center justify-center gap-1"
+                  className="w-full bg-[#ebdcc4] hover:bg-[#dfcdb2] text-[#172b31] border border-[#c9aa6d] font-bold py-1.5 px-2 rounded text-[10px] transition cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Code size={11} />
                   <span>GET EMBED / API CODE</span>

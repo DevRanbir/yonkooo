@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { Radio } from 'lucide-react';
+import { OceanBackground } from "@/components/ocean-background";
 import { CallerDistressTerminal } from "@/components/dendenmushi/CallerDistressTerminal";
 import { DistressFormModal } from "@/components/dendenmushi/DistressFormModal";
 import { EmbedModal } from "@/components/dendenmushi/EmbedModal";
@@ -10,16 +12,9 @@ import { generateRandomSeed, generateMushiFromSeed } from "@/lib/dendenmushi/see
 import { soundEngine } from "@/lib/dendenmushi/soundEngine";
 import { networkSync } from "@/lib/dendenmushi/networkSync";
 
-export default function ContactPage() {
-  useEffect(() => {
-    document.documentElement.classList.add("landing-active");
-    document.body.classList.add("landing-active");
-    return () => {
-      document.documentElement.classList.remove("landing-active");
-      document.body.classList.remove("landing-active");
-    };
-  }, []);
+import { createFirebaseDistressCall, sendFirebaseChatMessage } from "@/lib/dendenmushi/firebaseChat";
 
+export default function ContactPage() {
   const initialSeed = useMemo(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -51,13 +46,36 @@ export default function ContactPage() {
     });
   };
 
-  const handleDistressFormSubmit = (data: any) => {
+  const handleDistressFormSubmit = async (data: any) => {
+    const sessionId = `SOS-${Math.floor(1000 + Math.random() * 9000)}`;
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // 1. Write distress record directly to Firebase Realtime Database
+    await createFirebaseDistressCall({
+      id: sessionId,
+      type: data.classification,
+      island: data.island,
+      sector: data.coordinates,
+      severity: data.urgency === 'critical' ? 'critical' : data.urgency === 'high' ? 'high' : 'medium',
+      description: data.details || `Distress SOS Log transmitted via Transponder Snail (${data.callerId})`,
+      callerName: data.callerId || 'Civilian Caller',
+      denDenFrequency: data.frequency || '108.4 MHz'
+    }).catch(console.error);
+
+    // 2. Broadcast system announcement to Firebase 3D Chat
+    await sendFirebaseChatMessage({
+      sender: 'system',
+      text: `🚨 DISTRESS SOS TRANSMISSION LOGGED: ${data.classification} at ${data.island} (${data.coordinates})`,
+      timestamp: timeStr,
+      sosAlert: true
+    }).catch(console.error);
+
     const newSession: SosSession = {
-      sessionId: `SOS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      sessionId,
       callerId: data.callerId || 'CALLER-82A1',
       callerRole: 'Civilian Distress Caller',
       status: 'CONNECTING',
-      createdAt: new Date().toLocaleTimeString(),
+      createdAt: timeStr,
       locationName: data.island,
       coordinates: data.coordinates,
       incidentType: data.classification,
@@ -67,7 +85,7 @@ export default function ContactPage() {
       channel: data.frequency || '07',
       recordingEvents: [
         {
-          timestamp: new Date().toLocaleTimeString(),
+          timestamp: timeStr,
           sender: 'CALLER',
           text: `🚨 DISTRESS SOS FORM SUBMITTED: ${data.details}`
         }
@@ -78,6 +96,7 @@ export default function ContactPage() {
     const updated = [newSession, ...currentSessions];
     networkSync.saveActiveSessions(updated);
     networkSync.broadcast('SOS_SUBMITTED', newSession);
+
     if (!isMuted) {
       soundEngine.startSiren();
     }
@@ -85,32 +104,51 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="contact-frame-landing">
-      {/* 🌊 Living Ocean Background Video */}
-      <video className="landing-bg-video" autoPlay loop muted playsInline>
-        <source src="/background.mp4" type="video/mp4" />
-      </video>
+    <main className="contact-page-shell">
+      {/* 🌊 Living Ocean Video Background */}
+      <OceanBackground />
 
-      {/* 🖥️ Centered Den Den Mushi Cockpit Hub (Directly Inside Frame Window, Zero Scroll) */}
-      <div className="contact-center-hub">
-        <CallerDistressTerminal
-          config={config}
-          onConfigChange={setConfig}
-          onSelectRegion={handleSelectRegion}
-          isMuted={isMuted}
-          onToggleMute={handleToggleMute}
-          onOpenDistressForm={() => setIsDistressFormOpen(true)}
-          onOpenEmbed={() => setIsEmbedOpen(true)}
-        />
+      {/* 📜 Authentic One Piece Ancient Parchment Scroll */}
+      <div className="contact-scroll-wrapper">
+        <div className="contact-parchment-scroll">
+          {/* Scroll Header */}
+          <header className="contact-scroll-heading">
+            <div>
+              <div className="contact-kicker">
+                <Radio size={13} />
+                <span>GRAND LINE TRANSPONDER · FREQUENCY 07 PURUPURU STATION</span>
+              </div>
+              <h1 className="contact-title">
+                Den Den Mushi <em>Communicator.</em>
+              </h1>
+              <p className="contact-subtitle">
+                Grand Line priority emergency voice transponder, real-time AI audio link, and fleet triage station.
+              </p>
+            </div>
+          </header>
+
+          {/* Centered Cockpit Terminal inside Parchment Bounds */}
+          <div className="contact-terminal-body">
+            <CallerDistressTerminal
+              config={config}
+              onConfigChange={setConfig}
+              onSelectRegion={handleSelectRegion}
+              isMuted={isMuted}
+              onToggleMute={handleToggleMute}
+              onOpenDistressForm={() => setIsDistressFormOpen(true)}
+              onOpenEmbed={() => setIsEmbedOpen(true)}
+            />
+          </div>
+        </div>
       </div>
 
       {/* 🧭 Transparent Command Frame HUD Overlay */}
-      <div className="landing-frame" aria-hidden="true">
+      <div className="landing-frame contact-frame" aria-hidden="true">
         <img src="/landing-command-frame-transparent.png" alt="" />
       </div>
 
       {/* 🧭 Interactive Corner Nav Controls */}
-      <nav className="frame-controls" aria-label="Landing page controls">
+      <nav className="frame-controls contact-frame-controls" aria-label="Landing page controls">
         <Link href="/dashboard" className="frame-button frame-dashboard">
           DASHBOARD
         </Link>
