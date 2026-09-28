@@ -22,8 +22,8 @@ export const metadata: Metadata = { title: "Den Den Mushi SOS", description: "Gr
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <DispatchProvider>
           <Suspense fallback={null}>
             <ScreenTransitionLoader />
