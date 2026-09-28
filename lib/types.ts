@@ -4,6 +4,7 @@ export type Status = "queued" | "assigned" | "dispatched" | "arrived" | "in_prog
 
 export interface Emergency {
   id: string;
+  firebaseKey?: string;
   type: string;
   island: string;
   sector: string;

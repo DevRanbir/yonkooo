@@ -22,7 +22,7 @@ export default function Home() {
 
       <section className="hero-center">
         <div className="hero-kicker">
-          <Radio size={14} /> GRAND LINE EMERGENCY NETWORK
+          <Radio size={18} /> When the Den Den Mushi rings, the Chopper's Armada answers.
         </div>
         <img
           src="/chopper-logo.png"

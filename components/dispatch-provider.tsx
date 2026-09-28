@@ -2,92 +2,9 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Emergency, Severity, Status } from "../lib/types";
-import { priorityScore, rescueArmadaCrews } from "../lib/types";
-
-const seedEmergencies: Emergency[] = [
-  {
-    id: "SOS-1824",
-    type: "Blizzard Exposure & Hypothermia",
-    island: "Drum Island",
-    sector: "Big Horn Village Ridge",
-    severity: "critical",
-    description: "Avalanche struck civilian settlement. 7 victims trapped in sub-zero snow drift with severe hypothermia.",
-    status: "queued",
-    createdAt: Date.now() - 16 * 60000, // 16 minutes ago
-    callerName: "Dalton (Civilian Guard)",
-    denDenFrequency: "108.4 MHz"
-  },
-  {
-    id: "SOS-1819",
-    type: "Toxic Gas Containment Breach",
-    island: "Punk Hazard",
-    sector: "Research Lab Section C",
-    severity: "critical",
-    description: "Smiley chemical residue container ruptured. Toxic gas spreading towards coastline evacuation pier.",
-    status: "assigned",
-    team: "Heart Pirates Medical Submarine",
-    claimedAt: Date.now() - 5 * 60000,
-    createdAt: Date.now() - 9 * 60000, // 9 minutes ago
-    callerName: "G-5 Marine Patrol Scout",
-    denDenFrequency: "114.2 MHz"
-  },
-  {
-    id: "SOS-1808",
-    type: "Desert Sandstorm Fleet Stranded",
-    island: "Alabasta",
-    sector: "Yuba Desert Oasis Route",
-    severity: "high",
-    description: "Sandstorm buried caravan tracks. 32 merchants & pack animals stranded with under 4 hours of water remaining.",
-    status: "queued",
-    createdAt: Date.now() - 34 * 60000, // 34 minutes ago (high waiting time boosts priority!)
-    callerName: "Kohza (Sand Governance)",
-    denDenFrequency: "98.6 MHz"
-  },
-  {
-    id: "SOS-1795",
-    type: "Aqua Laguna Flood Evacuation",
-    island: "Water 7",
-    sector: "Lower Canal Station 3",
-    severity: "high",
-    description: "Tidal wave warning initiated. Lower residential quarter requires water-strider emergency fleet evacuation.",
-    status: "dispatched",
-    team: "Chopper's Medical Rescue Flagship",
-    claimedAt: Date.now() - 20 * 60000,
-    createdAt: Date.now() - 25 * 60000,
-    callerName: "Galley-La Shipwright Dispatch",
-    denDenFrequency: "104.8 MHz"
-  },
-  {
-    id: "SOS-1772",
-    type: "Sea King Attack on Civilian Vessel",
-    island: "Fishman Island",
-    sector: "Coral Hill Trench",
-    severity: "medium",
-    description: "Carnivorous Sea King damaged bubble coating of cargo brig. Hull integrity holding at 65%.",
-    status: "in_progress",
-    team: "Revolutionary Army Relief Squadron",
-    claimedAt: Date.now() - 40 * 60000,
-    createdAt: Date.now() - 52 * 60000,
-    callerName: "Neptunian Royal Border Watch",
-    denDenFrequency: "92.1 MHz"
-  },
-  {
-    id: "SOS-1740",
-    type: "Buster Call Collateral Trauma",
-    island: "Dressrosa",
-    sector: "Green Bit Shallow Straits",
-    severity: "low",
-    description: "Minor shrapnel injuries following offshore skirmish. All civilians stabilized; supplies replenished.",
-    status: "resolved",
-    team: "Doctor Kureha's Highland Snow Sleds",
-    createdAt: Date.now() - 95 * 60000,
-    claimedAt: Date.now() - 75 * 60000,
-    resolvedAt: Date.now() - 30 * 60000,
-    resolutionNotes: "Treated 14 minor lacerations with plum wine antiseptic and stabilized shock. Evacuated to harbor.",
-    callerName: "Tontatta Patrol Unit",
-    denDenFrequency: "102.5 MHz"
-  }
-];
+import { rescueArmadaCrews } from "../lib/types";
+import { realtimeDatabase } from "../lib/firebase";
+import { onValue, push, ref, remove, set, update } from "firebase/database";
 
 interface DispatchContextValue {
   emergencies: Emergency[];
@@ -97,6 +14,7 @@ interface DispatchContextValue {
   advance: (id: string) => void;
   resolve: (id: string, notes?: string) => void;
   updateSeverity: (id: string, severity: Severity) => void;
+  removeEmergency: (id: string) => void;
   simulateIncomingSOS: () => Emergency;
   resetToSeed: () => void;
 }
@@ -104,21 +22,93 @@ interface DispatchContextValue {
 const DispatchContext = createContext<DispatchContextValue | null>(null);
 
 export function DispatchProvider({ children }: { children: React.ReactNode }) {
-  const [emergencies, setEmergencies] = useState<Emergency[]>(seedEmergencies);
+  // Start with empty array - strictly no fake data if Firebase has no records!
+  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
-  // Load from localStorage on mount
+  // Real-time synchronization with Firebase Realtime Database
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("ddm-emergencies-v2");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setEmergencies(parsed);
+      const dispatchesRef = ref(realtimeDatabase, "dispatches");
+      const unsubscribe = onValue(
+        dispatchesRef,
+        (snapshot) => {
+          if (!snapshot.exists()) {
+            // Firebase has NO data -> emergencies is empty []!
+            setEmergencies([]);
+            return;
+          }
+
+          const data = snapshot.val();
+          if (!data || typeof data !== "object") {
+            setEmergencies([]);
+            return;
+          }
+
+          const parsedList: Emergency[] = Object.entries(data).map(([key, val]: [string, any]) => {
+            let createdAtNum = Date.now();
+            if (typeof val.createdAt === "number") {
+              createdAtNum = val.createdAt;
+            } else if (typeof val.createdAt === "string") {
+              const parsed = parseInt(val.createdAt, 10);
+              if (!isNaN(parsed)) createdAtNum = parsed;
+            }
+
+            return {
+              id: val.id || `SOS-${key.slice(-4).toUpperCase()}`,
+              firebaseKey: key,
+              type: val.type || "General Emergency",
+              island: val.island || "Unknown Island",
+              sector: val.sector || "Uncharted Sector",
+              severity: (val.severity || "medium") as Severity,
+              description: val.description || "",
+              status: (val.status || "queued") as Status,
+              createdAt: createdAtNum,
+              updatedAt: typeof val.updatedAt === "number" ? val.updatedAt : undefined,
+              claimedAt: typeof val.claimedAt === "number" ? val.claimedAt : undefined,
+              resolvedAt: typeof val.resolvedAt === "number" ? val.resolvedAt : undefined,
+              team: val.team,
+              callerName: val.callerName,
+              denDenFrequency: val.denDenFrequency || "108.4 MHz",
+              resolutionNotes: val.resolutionNotes
+            };
+          });
+
+          // Strictly deduplicate by firebaseKey and id
+          const uniqueList: Emergency[] = [];
+          const seen = new Set<string>();
+
+          for (const item of parsedList) {
+            const keyId = item.firebaseKey || item.id;
+            if (!seen.has(keyId) && !seen.has(item.id)) {
+              seen.add(keyId);
+              seen.add(item.id);
+              uniqueList.push(item);
+            }
+          }
+
+          // Sort by creation time descending (newest first)
+          uniqueList.sort((a, b) => b.createdAt - a.createdAt);
+          setEmergencies(uniqueList);
+        },
+        (error) => {
+          console.error("Firebase Realtime Database listener error:", error);
+          // If offline/error, read from localStorage fallback
+          try {
+            const saved = localStorage.getItem("ddm-emergencies-v2");
+            if (saved) {
+              const localList = JSON.parse(saved);
+              if (Array.isArray(localList)) {
+                setEmergencies(localList);
+              }
+            }
+          } catch {}
         }
-      }
+      );
+
+      return () => unsubscribe();
     } catch (e) {
-      console.error("Failed to load saved emergencies", e);
+      console.error("Failed to connect to Firebase Realtime Database:", e);
     }
   }, []);
 
@@ -127,11 +117,11 @@ export function DispatchProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem("ddm-emergencies-v2", JSON.stringify(emergencies));
     } catch (e) {
-      console.error("Failed to save emergencies", e);
+      console.error("Failed to save emergencies to localStorage", e);
     }
   }, [emergencies]);
 
-  // Dynamic real-time timer: tick every 3 seconds to re-calculate waiting times and priorities
+  // Tick timer every 3 seconds to update relative wait times
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(Date.now());
@@ -139,133 +129,247 @@ export function DispatchProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(timer);
   }, []);
 
-  const value = useMemo<DispatchContextValue>(() => ({
-    emergencies,
-    currentTime,
+  const value = useMemo<DispatchContextValue>(
+    () => ({
+      emergencies,
+      currentTime,
 
-    create: (input) => {
-      const newEmergency: Emergency = {
-        ...input,
-        id: `SOS-${Math.floor(1000 + Math.random() * 8999)}`,
-        createdAt: Date.now(),
-        status: "queued",
-        denDenFrequency: input.denDenFrequency || "108.4 MHz"
-      };
-      setEmergencies((prev) => [newEmergency, ...prev]);
-      return newEmergency;
-    },
+      create: (input) => {
+        const id = `SOS-${Math.floor(1000 + Math.random() * 8999)}`;
+        const now = Date.now();
+        const newEmergency: Emergency = {
+          ...input,
+          id,
+          createdAt: now,
+          status: "queued",
+          denDenFrequency: input.denDenFrequency || "108.4 MHz"
+        };
 
-    claim: (id: string, teamName?: string) => {
-      const selectedCrew = teamName || rescueArmadaCrews[0].name;
-      setEmergencies((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status: "assigned",
-                team: selectedCrew,
-                claimedAt: Date.now(),
-                updatedAt: Date.now()
-              }
-            : item
-        )
-      );
-    },
+        // Write directly to Firebase
+        try {
+          const newRef = push(ref(realtimeDatabase, "dispatches"));
+          newEmergency.firebaseKey = newRef.key || undefined;
+          set(newRef, {
+            ...newEmergency,
+            createdAt: now
+          }).catch((err) => console.error("Firebase push error:", err));
+        } catch (e) {
+          console.error("Failed to push to Firebase:", e);
+        }
 
-    advance: (id: string) => {
-      const nextStatusMap: Record<Status, Status> = {
-        queued: "assigned",
-        assigned: "dispatched",
-        dispatched: "arrived",
-        arrived: "in_progress",
-        in_progress: "resolved",
-        resolved: "resolved"
-      };
+        setEmergencies((prev) => {
+          if (
+            prev.some(
+              (e) =>
+                e.id === newEmergency.id ||
+                (newEmergency.firebaseKey && e.firebaseKey === newEmergency.firebaseKey)
+            )
+          ) {
+            return prev;
+          }
+          return [newEmergency, ...prev];
+        });
+        return newEmergency;
+      },
 
-      setEmergencies((prev) =>
-        prev.map((item) => {
-          if (item.id !== id) return item;
-          const next = nextStatusMap[item.status];
-          return {
-            ...item,
-            status: next,
-            updatedAt: Date.now(),
-            resolvedAt: next === "resolved" ? Date.now() : item.resolvedAt,
-            resolutionNotes:
-              next === "resolved" && !item.resolutionNotes
-                ? "Emergency stabilized and successfully resolved by Chopper's Medical Rescue Armada."
-                : item.resolutionNotes
-          };
-        })
-      );
-    },
+      claim: (id: string, teamName?: string) => {
+        const selectedCrew = teamName || rescueArmadaCrews[0].name;
+        const target = emergencies.find((e) => e.id === id);
+        const now = Date.now();
 
-    resolve: (id: string, notes?: string) => {
-      setEmergencies((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status: "resolved",
-                resolvedAt: Date.now(),
-                updatedAt: Date.now(),
-                resolutionNotes:
-                  notes || "Emergency fully resolved. Medical triage complete; casualties evacuated safely."
-              }
-            : item
-        )
-      );
-    },
+        if (target?.firebaseKey) {
+          try {
+            update(ref(realtimeDatabase, `dispatches/${target.firebaseKey}`), {
+              status: "assigned",
+              team: selectedCrew,
+              claimedAt: now,
+              updatedAt: now
+            }).catch(console.error);
+          } catch (e) {
+            console.error("Failed to update Firebase:", e);
+          }
+        }
 
-    updateSeverity: (id: string, severity: Severity) => {
-      setEmergencies((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? { ...item, severity, updatedAt: Date.now() }
-            : item
-        )
-      );
-    },
+        setEmergencies((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: "assigned",
+                  team: selectedCrew,
+                  claimedAt: now,
+                  updatedAt: now
+                }
+              : item
+          )
+        );
+      },
 
-    simulateIncomingSOS: () => {
-      const randomIslands = ["Drum Island", "Alabasta", "Punk Hazard", "Water 7", "Dressrosa"];
-      const randomTypes = [
-        "Blizzard Exposure & Hypothermia",
-        "Toxic Gas Containment Breach",
-        "Desert Sandstorm Fleet Stranded",
-        "Aqua Laguna Flood Evacuation",
-        "Avalanche Medical Search & Rescue"
-      ];
-      const randomSeverities: Severity[] = ["critical", "high", "medium"];
-      
-      const island = randomIslands[Math.floor(Math.random() * randomIslands.length)];
-      const type = randomTypes[Math.floor(Math.random() * randomTypes.length)];
-      const severity = randomSeverities[Math.floor(Math.random() * randomSeverities.length)];
+      advance: (id: string) => {
+        const nextStatusMap: Record<Status, Status> = {
+          queued: "assigned",
+          assigned: "dispatched",
+          dispatched: "arrived",
+          arrived: "in_progress",
+          in_progress: "resolved",
+          resolved: "resolved"
+        };
 
-      const simulated: Emergency = {
-        id: `SOS-${Math.floor(2000 + Math.random() * 7999)}`,
-        type,
-        island,
-        sector: `Sector ${Math.floor(1 + Math.random() * 8)} Alpha`,
-        severity,
-        description: `URGENT DISTRESS BROADCAST: Immediate relief required on ${island}. Den Den Mushi transmission received.`,
-        status: "queued",
-        createdAt: Date.now(),
-        callerName: "Den Den Snail Relay",
-        denDenFrequency: "108.4 MHz"
-      };
+        const target = emergencies.find((e) => e.id === id);
+        if (!target) return;
 
-      setEmergencies((prev) => [simulated, ...prev]);
-      return simulated;
-    },
+        const next = nextStatusMap[target.status];
+        const now = Date.now();
+        const resolvedAt = next === "resolved" ? now : target.resolvedAt;
+        const resolutionNotes =
+          next === "resolved" && !target.resolutionNotes
+            ? "Emergency stabilized and successfully resolved by Chopper's Medical Rescue Armada."
+            : target.resolutionNotes;
 
-    resetToSeed: () => {
-      setEmergencies(seedEmergencies);
-      try {
-        localStorage.removeItem("ddm-emergencies-v2");
-      } catch (e) {}
-    }
-  }), [emergencies, currentTime]);
+        if (target.firebaseKey) {
+          try {
+            update(ref(realtimeDatabase, `dispatches/${target.firebaseKey}`), {
+              status: next,
+              updatedAt: now,
+              resolvedAt: resolvedAt || null,
+              resolutionNotes: resolutionNotes || null
+            }).catch(console.error);
+          } catch (e) {
+            console.error("Failed to update Firebase status:", e);
+          }
+        }
+
+        setEmergencies((prev) =>
+          prev.map((item) => {
+            if (item.id !== id) return item;
+            return {
+              ...item,
+              status: next,
+              updatedAt: now,
+              resolvedAt,
+              resolutionNotes
+            };
+          })
+        );
+      },
+
+      resolve: (id: string, notes?: string) => {
+        const target = emergencies.find((e) => e.id === id);
+        const now = Date.now();
+        const defaultNotes =
+          notes || "Emergency fully resolved. Medical triage complete; casualties evacuated safely.";
+
+        if (target?.firebaseKey) {
+          try {
+            update(ref(realtimeDatabase, `dispatches/${target.firebaseKey}`), {
+              status: "resolved",
+              resolvedAt: now,
+              updatedAt: now,
+              resolutionNotes: defaultNotes
+            }).catch(console.error);
+          } catch (e) {
+            console.error("Failed to resolve in Firebase:", e);
+          }
+        }
+
+        setEmergencies((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: "resolved",
+                  resolvedAt: now,
+                  updatedAt: now,
+                  resolutionNotes: defaultNotes
+                }
+              : item
+          )
+        );
+      },
+
+      updateSeverity: (id: string, severity: Severity) => {
+        const target = emergencies.find((e) => e.id === id);
+        const now = Date.now();
+
+        if (target?.firebaseKey) {
+          try {
+            update(ref(realtimeDatabase, `dispatches/${target.firebaseKey}`), {
+              severity,
+              updatedAt: now
+            }).catch(console.error);
+          } catch (e) {
+            console.error("Failed to update severity in Firebase:", e);
+          }
+        }
+
+        setEmergencies((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, severity, updatedAt: now } : item
+          )
+        );
+      },
+
+      removeEmergency: (id: string) => {
+        const target = emergencies.find((e) => e.id === id);
+        if (target?.firebaseKey) {
+          remove(ref(realtimeDatabase, `dispatches/${target.firebaseKey}`)).catch(console.error);
+        }
+        setEmergencies((prev) => prev.filter((e) => e.id !== id));
+      },
+
+      simulateIncomingSOS: () => {
+        const randomIslands = ["Drum Island", "Alabasta", "Punk Hazard", "Water 7", "Dressrosa"];
+        const randomTypes = [
+          "Blizzard Exposure & Hypothermia",
+          "Toxic Gas Containment Breach",
+          "Desert Sandstorm Fleet Stranded",
+          "Aqua Laguna Flood Evacuation",
+          "Avalanche Medical Search & Rescue"
+        ];
+        const randomSeverities: Severity[] = ["critical", "high", "medium"];
+
+        const island = randomIslands[Math.floor(Math.random() * randomIslands.length)];
+        const type = randomTypes[Math.floor(Math.random() * randomTypes.length)];
+        const severity = randomSeverities[Math.floor(Math.random() * randomSeverities.length)];
+
+        const now = Date.now();
+        const id = `SOS-${Math.floor(2000 + Math.random() * 7999)}`;
+        const simulated: Emergency = {
+          id,
+          type,
+          island,
+          sector: `Sector ${Math.floor(1 + Math.random() * 8)} Alpha`,
+          severity,
+          description: `URGENT DISTRESS BROADCAST: Immediate relief required on ${island}. Den Den Mushi transmission received.`,
+          status: "queued",
+          createdAt: now,
+          callerName: "Den Den Snail Relay",
+          denDenFrequency: "108.4 MHz"
+        };
+
+        try {
+          const newRef = push(ref(realtimeDatabase, "dispatches"));
+          simulated.firebaseKey = newRef.key || undefined;
+          set(newRef, {
+            ...simulated,
+            createdAt: now
+          }).catch(console.error);
+        } catch {}
+
+        setEmergencies((prev) => [simulated, ...prev]);
+        return simulated;
+      },
+
+      resetToSeed: () => {
+        setEmergencies([]);
+        try {
+          localStorage.removeItem("ddm-emergencies-v2");
+          remove(ref(realtimeDatabase, "dispatches")).catch(console.error);
+        } catch (e) {}
+      }
+    }),
+    [emergencies, currentTime]
+  );
 
   return <DispatchContext.Provider value={value}>{children}</DispatchContext.Provider>;
 }

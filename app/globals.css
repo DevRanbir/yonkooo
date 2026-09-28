@@ -181,3 +181,43 @@
     font-family: var(--font-sans);
   }
 }
+
+/* Custom One Piece Log Pose / Compass Cursor */
+html,
+body,
+* {
+  cursor: url('/cursor.png') 0 0, auto;
+}
+
+a,
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+label[for],
+summary,
+.cursor-pointer {
+  cursor: url('/cursor-pointer.png') 0 0, pointer !important;
+}
+
+.cursor-default {
+  cursor: url('/cursor.png') 0 0, default !important;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="search"],
+textarea,
+[contenteditable="true"] {
+  cursor: text !important;
+}
+
+[disabled],
+.cursor-not-allowed,
+:disabled {
+  cursor: not-allowed !important;
+}

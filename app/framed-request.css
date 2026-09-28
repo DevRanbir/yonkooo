@@ -1,0 +1,44 @@
+.framed-request {
+  min-height: 100vh;
+  padding: clamp(68px, 7.5vh, 105px) clamp(16px, 3vw, 40px) clamp(72px, 8.5vh, 115px);
+  background: transparent !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-sizing: border-box;
+}
+.framed-request:after {
+  background: linear-gradient(90deg, #04172380, #0417233d) !important;
+}
+.framed-request .landing-frame {
+  position: fixed;
+}
+.framed-request .request-frame-controls {
+  position: fixed;
+}
+@media (max-width: 800px) {
+  .framed-request {
+    padding: 60px 12px 68px;
+  }
+  .framed-request .request-frame {
+    display: none;
+  }
+  .framed-request .request-frame-controls {
+    inset: auto 14px 14px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    height: auto;
+    pointer-events: auto;
+  }
+  .framed-request .request-frame-controls .frame-button {
+    position: static;
+    pointer-events: auto;
+    color: #fff7df;
+    background: #b93b32;
+    padding: 9px 10px;
+    font: 700 9px var(--font-mono);
+    letter-spacing: .08em;
+  }
+}

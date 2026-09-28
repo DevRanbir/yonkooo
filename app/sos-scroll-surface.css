@@ -1,0 +1,401 @@
+/* ==========================================================================
+   SoS Parchment Scroll Form Surface (Directly on /backgroundScroll.png)
+   ========================================================================== */
+
+/* 1. Force removal of any dark, solid, or gradient backgrounds on all request form containers */
+.framed-request form,
+.request-page form,
+form.sos-form-body,
+.sos-parchment-scroll form,
+.sos-scroll-wrapper form {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  position: relative !important;
+}
+
+/* Eliminate any old decorative banner text attached via pseudo-elements */
+.framed-request form:before,
+.request-page form:before,
+form.sos-form-body:before,
+.sos-parchment-scroll:before,
+.sos-parchment-scroll form:before {
+  display: none !important;
+  content: none !important;
+}
+
+/* 2. Scroll Container centered within the framed viewport */
+.sos-scroll-wrapper {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 3. The authentic antique parchment scroll canvas */
+.sos-parchment-scroll {
+  position: relative;
+  width: 100%;
+  background-image: url('/backgroundScroll.png') !important;
+  background-size: 100% 100% !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 20px 45px rgba(2, 10, 18, 0.65)) !important;
+  box-sizing: border-box;
+  /* Safe-area padding: Generous margins top & bottom to clear the torn deckled edges,
+     and wide right margin to decrease width away from the right scroll roll */
+  padding-top: clamp(48px, 6.5vh, 70px) !important;
+  padding-bottom: clamp(54px, 7.5vh, 80px) !important;
+  padding-left: clamp(75px, 9vw, 125px) !important;
+  padding-right: clamp(155px, 19vw, 200px) !important;
+}
+
+/* 4. Scroll Header typography */
+.sos-scroll-header {
+  margin-bottom: 12px;
+}
+
+.sos-channel-kicker {
+  font: 800 11px 'DM Mono', monospace;
+  letter-spacing: 1.5px;
+  color: #a82f2b !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.sos-scroll-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(26px, 3.2vw, 38px);
+  font-weight: 800;
+  line-height: 1.05;
+  color: #141f25 !important;
+  margin: 0 0 4px !important;
+}
+
+.sos-scroll-title em {
+  color: #b93b32 !important;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.sos-scroll-desc {
+  font-family: 'Manrope', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #2b3941 !important;
+  margin: 0;
+  max-width: 620px;
+}
+
+/* 5. Form fields layout directly on the parchment paper */
+.sos-form-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.sos-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.sos-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.sos-field-label {
+  display: block;
+  font: 800 10.5px 'DM Mono', monospace !important;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #17262d !important;
+  margin-bottom: 3px;
+}
+
+/* 6. Translucent parchment inputs harmonizing with the paper */
+.sos-input-field {
+  width: 100% !important;
+  background: rgba(255, 252, 244, 0.85) !important;
+  border: 1.5px solid rgba(135, 100, 50, 0.45) !important;
+  border-radius: 4px !important;
+  padding: 8px 12px !important;
+  font: 600 13.5px 'Manrope', Arial, sans-serif !important;
+  color: #0f181c !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.sos-input-field:focus {
+  background: #ffffff !important;
+  border-color: #b93b32 !important;
+  box-shadow: 0 0 0 3px rgba(185, 59, 50, 0.2) !important;
+  outline: none !important;
+}
+
+.sos-textarea-field {
+  height: 64px !important;
+  min-height: 56px !important;
+  resize: vertical !important;
+  line-height: 1.4 !important;
+}
+
+/* 7. Severity selector row and buttons */
+.sos-severity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.sos-points-hint {
+  font: 800 10.5px 'DM Mono', monospace;
+  color: #a82f2b !important;
+}
+
+.sos-severity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.sos-sev-btn {
+  background: rgba(255, 250, 240, 0.75) !important;
+  border: 1.5px solid rgba(135, 100, 50, 0.35) !important;
+  border-radius: 4px !important;
+  padding: 6px 4px !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sos-sev-btn:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(135, 100, 50, 0.7) !important;
+}
+
+.sos-sev-name {
+  font: 800 11px 'DM Mono', monospace;
+  text-transform: uppercase;
+  color: #1e2b32 !important;
+}
+
+.sos-sev-pts {
+  font: 700 9.5px 'DM Mono', monospace;
+  color: #64748b !important;
+}
+
+.sos-sev-btn.active.critical {
+  border-color: #dc2626 !important;
+  background: rgba(220, 38, 38, 0.2) !important;
+}
+.sos-sev-btn.active.critical .sos-sev-name { color: #b91c1c !important; font-weight: 800; }
+.sos-sev-btn.active.critical .sos-sev-pts { color: #dc2626 !important; }
+
+.sos-sev-btn.active.high {
+  border-color: #d97706 !important;
+  background: rgba(217, 119, 6, 0.2) !important;
+}
+.sos-sev-btn.active.high .sos-sev-name { color: #b45309 !important; font-weight: 800; }
+.sos-sev-btn.active.high .sos-sev-pts { color: #d97706 !important; }
+
+.sos-sev-btn.active.medium {
+  border-color: #0284c7 !important;
+  background: rgba(2, 132, 199, 0.2) !important;
+}
+.sos-sev-btn.active.medium .sos-sev-name { color: #0369a1 !important; font-weight: 800; }
+.sos-sev-btn.active.medium .sos-sev-pts { color: #0284c7 !important; }
+
+.sos-sev-btn.active.low {
+  border-color: #475569 !important;
+  background: rgba(71, 85, 105, 0.2) !important;
+}
+.sos-sev-btn.active.low .sos-sev-name { color: #334155 !important; font-weight: 800; }
+.sos-sev-btn.active.low .sos-sev-pts { color: #475569 !important; }
+
+/* 8. Action Footer Buttons */
+.sos-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sos-preset-btn {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1.5px solid rgba(135, 100, 50, 0.5) !important;
+  padding: 8px 14px !important;
+  border-radius: 4px !important;
+  font: 700 11px 'DM Mono', monospace !important;
+  letter-spacing: 0.5px !important;
+  color: #17262d !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sos-preset-btn:hover {
+  background: #ffffff !important;
+  border-color: #b93b32 !important;
+  color: #b93b32 !important;
+}
+
+.sos-submit-btn {
+  background: #b93b32 !important;
+  border: 1.5px solid #992820 !important;
+  color: #ffffff !important;
+  padding: 9px 22px !important;
+  border-radius: 4px !important;
+  font: 800 11.5px 'DM Mono', monospace !important;
+  letter-spacing: 1px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(185, 59, 50, 0.35) !important;
+  transition: all 0.2s ease !important;
+}
+
+.sos-submit-btn:hover {
+  background: #992820 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(185, 59, 50, 0.45) !important;
+}
+
+/* 9. Confirmation View inside the parchment scroll */
+.sos-confirmation-box {
+  text-align: center;
+  padding: 24px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sos-confirm-icon {
+  color: #10b981;
+  margin-bottom: 10px;
+}
+
+.sos-confirm-kicker {
+  font: 800 11px 'DM Mono', monospace;
+  letter-spacing: 1.5px;
+  color: #10b981 !important;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.sos-confirm-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: #141f25 !important;
+  margin: 0 0 8px !important;
+}
+
+.sos-confirm-desc {
+  font-family: 'Manrope', Arial, sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: #2b3941 !important;
+  max-width: 480px;
+  margin: 0 auto 20px;
+}
+
+.sos-confirm-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 9.5 Custom Drawer Select Styles */
+.sos-custom-drawer-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.sos-drawer-trigger {
+  width: 100%;
+  cursor: pointer;
+  background: rgba(255, 252, 244, 0.88) !important;
+  border: 1.5px solid rgba(135, 100, 50, 0.45) !important;
+  transition: all 0.2s ease !important;
+}
+
+.sos-drawer-trigger:hover,
+.sos-drawer-trigger.open {
+  background: #ffffff !important;
+  border-color: #b93b32 !important;
+  box-shadow: 0 0 0 3px rgba(185, 59, 50, 0.18) !important;
+}
+
+.sos-drawer-popover {
+  scrollbar-width: thin;
+  scrollbar-color: #c4a065 rgba(168, 121, 59, 0.1);
+}
+
+.sos-drawer-popover *::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sos-drawer-popover *::-webkit-scrollbar-thumb {
+  background: #c4a065;
+  border-radius: 4px;
+}
+
+.sos-drawer-popover *::-webkit-scrollbar-track {
+  background: rgba(168, 121, 59, 0.08);
+}
+
+/* 10. Responsiveness for smaller screens */
+@media (max-width: 768px) {
+  .sos-parchment-scroll {
+    padding-top: 36px !important;
+    padding-bottom: 44px !important;
+    padding-left: clamp(32px, 8vw, 55px) !important;
+    padding-right: clamp(72px, 15vw, 115px) !important;
+    background-size: 100% 100% !important;
+  }
+  .sos-form-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .sos-severity-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sos-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sos-submit-btn,
+  .sos-preset-btn {
+    justify-content: center;
+  }
+}
