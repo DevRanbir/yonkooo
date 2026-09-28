@@ -14,6 +14,7 @@ import "./framed-request-fix.css";
 import "./sos-scroll-surface.css";
 import "./table-dashboard.css";
 import "./framed-map.css";
+import "./dendenmushi.css";
 import { Suspense } from "react";
 import { DispatchProvider } from "../components/dispatch-provider";
 import { ScreenTransitionLoader } from "../components/screen-transition-loader";

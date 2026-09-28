@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/request", label: "Transmit" },
   { href: "/team", label: "Armada" },
   { href: "/map", label: "Chart" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export function SiteNav() {
