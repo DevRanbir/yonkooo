@@ -1,0 +1,645 @@
+/* ==========================================================================
+   Horizontal Scroll Landing Page - Ancient Parchment Scroll & #F23794 Theme
+   ========================================================================== */
+
+body.landing-active,
+.landing-viewport {
+  --primary: #F23794;
+  --primary-hover: #d81e7a;
+  --primary-light: rgba(242, 55, 148, 0.15);
+  --ink-dark: #121518;
+  --ink-medium: #22272c;
+  --ink-subtle: #414950;
+}
+
+/* Prevent vertical scrolling on the landing page */
+html.landing-active,
+body.landing-active {
+  overflow: hidden !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  position: fixed !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* Static Background Video - Pure ocean & clouds playing in the deep background */
+.landing-bg-video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Main Horizontal Scrolling Viewport */
+.landing-viewport {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  scroll-behavior: smooth;
+  z-index: 2;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  color: var(--ink-dark);
+}
+
+.landing-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+/* Horizontal Sections - Full Screen Stages */
+.h-section {
+  width: 100vw;
+  min-width: 100vw;
+  height: 100vh;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-sizing: border-box;
+  padding: clamp(15px, 3vh, 35px) clamp(20px, 4vw, 50px);
+}
+
+/* ==========================================================================
+   Ancient Parchment Scroll Background Container for All Sections
+   ========================================================================== */
+.parchment-scroll {
+  position: relative;
+  width: min(1120px, 94vw);
+  height: min(720px, 88vh);
+  background-image: url('/backgroundScroll.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  /* Safe padding so all content sits precisely within the usable flat parchment */
+  padding: clamp(30px, 5.5vh, 60px) clamp(75px, 9.5vw, 140px);
+  filter: drop-shadow(0 20px 45px rgba(2, 10, 18, 0.55));
+  transition: transform 0.3s ease;
+}
+
+.parchment-scroll:hover {
+  transform: translateY(-2px);
+}
+
+.parchment-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* ==========================================================================
+   Parchment Typography (High Contrast Dark Ink & #F23794 Accents)
+   ========================================================================== */
+.landing-viewport h1,
+.landing-viewport h2,
+.landing-viewport h3,
+.landing-viewport h4 {
+  color: var(--ink-dark) !important;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  margin: 0;
+  text-shadow: none !important;
+}
+
+.landing-viewport h1 em,
+.landing-viewport h2 em {
+  color: var(--primary) !important;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.landing-viewport p {
+  color: var(--ink-medium) !important;
+  font-family: Manrope, Arial, sans-serif;
+  font-weight: 600;
+  text-shadow: none !important;
+}
+
+.section-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 11px 'DM Mono', monospace;
+  letter-spacing: 2px;
+  font-weight: 800;
+  color: var(--primary) !important;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.section-tag svg {
+  color: var(--primary);
+}
+
+/* ==========================================================================
+   Primary Buttons & Links with #F23794
+   ========================================================================== */
+.map-main-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border: 2px solid var(--primary) !important;
+  padding: 13px 28px !important;
+  font-size: 11px !important;
+  letter-spacing: 1.5px !important;
+  font-weight: 800 !important;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(242, 55, 148, 0.35) !important;
+  transition: all 0.2s ease !important;
+  text-shadow: none !important;
+  text-decoration: none;
+}
+
+.map-main-button:hover {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(242, 55, 148, 0.45) !important;
+}
+
+.map-main-button svg {
+  color: #ffffff;
+}
+
+.button-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.65) !important;
+  color: var(--ink-dark) !important;
+  border: 2px solid var(--ink-dark) !important;
+  padding: 13px 22px !important;
+  font-size: 11px !important;
+  letter-spacing: 1.2px !important;
+  font-weight: 800 !important;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.2s ease !important;
+  text-shadow: none !important;
+  text-decoration: none;
+}
+
+.button-outline:hover {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(242, 55, 148, 0.3) !important;
+}
+
+.button-outline:hover svg {
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Section 0: Hero
+   ========================================================================== */
+.scroll-chopper-logo {
+  max-width: min(520px, 58vw);
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+  animation: logo-float 4.5s ease-in-out infinite;
+}
+
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.hero-scroll-title {
+  font-size: clamp(28px, 3.2vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -1px;
+  margin-bottom: 8px;
+}
+
+.hero-scroll-lead {
+  font-size: clamp(13px, 1.1vw, 15px);
+  line-height: 1.6;
+  max-width: 580px;
+  margin: 0 auto 20px;
+}
+
+.hero-h-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.h-scroll-prompt {
+  margin-top: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  font: 11px 'DM Mono', monospace;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.2s ease;
+}
+
+.h-scroll-prompt:hover {
+  transform: translateX(6px);
+  color: var(--primary-hover);
+}
+
+.h-scroll-prompt svg {
+  animation: cue-bounce 1.6s infinite ease-in-out;
+}
+
+@keyframes cue-bounce {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(6px); }
+}
+
+/* ==========================================================================
+   Section 1: The Signal
+   ========================================================================== */
+.signal-scroll-layout {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.signal-scroll-layout h2 {
+  font-size: clamp(28px, 3.2vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin-bottom: 10px;
+}
+
+.signal-scroll-lead {
+  font-size: clamp(13px, 1.05vw, 15px);
+  line-height: 1.6;
+  max-width: 600px;
+  margin: 0 auto 22px;
+}
+
+.signal-telemetry-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 22px;
+}
+
+.signal-parchment-item {
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(18, 21, 24, 0.15);
+  border-top: 3px solid var(--primary);
+  border-radius: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.signal-parchment-item.critical {
+  border-top-color: #dc2626;
+}
+
+.signal-parchment-item.high {
+  border-top-color: var(--primary);
+}
+
+.signal-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 10px 'DM Mono', monospace;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.signal-item-badge {
+  padding: 2px 5px;
+  border-radius: 2px;
+  background: var(--ink-dark);
+  color: #fff;
+}
+
+.signal-item-badge.critical {
+  background: #dc2626;
+}
+
+.signal-item-badge.high {
+  background: var(--primary);
+}
+
+.signal-parchment-item h4 {
+  font-size: 16px;
+  margin: 0 0 3px;
+}
+
+.signal-parchment-item p {
+  font-size: 11px;
+  margin: 0;
+  line-height: 1.4;
+  color: var(--ink-subtle) !important;
+}
+
+/* ==========================================================================
+   Section 2: The Engine
+   ========================================================================== */
+.engine-scroll-layout {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.engine-scroll-layout h2 {
+  font-size: clamp(28px, 3.2vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin-bottom: 10px;
+}
+
+.engine-scroll-lead {
+  font-size: clamp(13px, 1.05vw, 15px);
+  line-height: 1.6;
+  max-width: 600px;
+  margin: 0 auto 20px;
+}
+
+.engine-formula-box {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1.5px dashed var(--primary);
+  border-radius: 4px;
+  padding: 14px 24px;
+  margin-bottom: 22px;
+  max-width: 580px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.engine-formula-box span {
+  display: block;
+  font: 10px 'DM Mono', monospace;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.engine-formula-box code {
+  font: 12px 'DM Mono', monospace;
+  font-weight: 800;
+  color: var(--ink-dark);
+}
+
+/* ==========================================================================
+   Section 3: Response Zones
+   ========================================================================== */
+.zones-scroll-layout {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.zones-scroll-layout h2 {
+  font-size: clamp(28px, 3.2vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin-bottom: 8px;
+}
+
+.zones-scroll-lead {
+  font-size: clamp(12px, 1vw, 14px);
+  line-height: 1.5;
+  max-width: 540px;
+  margin: 0 auto 18px;
+}
+
+.zones-scroll-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  width: 100%;
+}
+
+.zone-parchment-card {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(18, 21, 24, 0.15);
+  border-radius: 4px;
+  padding: 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.zone-parchment-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary);
+}
+
+.zone-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 10px 'DM Mono', monospace;
+  font-weight: 800;
+}
+
+.zone-status-badge {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.zone-parchment-card h3 {
+  font-size: 18px;
+  margin: 6px 0 2px;
+}
+
+.zone-card-subtitle {
+  font: 10px 'DM Mono', monospace;
+  color: var(--primary);
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.zone-card-text {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-subtle) !important;
+  margin-bottom: 12px;
+  flex-grow: 1;
+}
+
+.zone-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(18, 21, 24, 0.12);
+  padding-top: 8px;
+  font: 10px 'DM Mono', monospace;
+  font-weight: 700;
+}
+
+.zone-card-foot a {
+  color: var(--primary);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.zone-card-foot a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Section 4: CTA Transmission
+   ========================================================================== */
+.cta-scroll-layout {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cta-pulse-icon {
+  color: var(--primary);
+  animation: pulse-beacon 2s infinite ease-in-out;
+  margin-bottom: 8px;
+}
+
+.cta-scroll-layout h2 {
+  font-size: clamp(30px, 3.5vw, 48px);
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+  margin-bottom: 10px;
+}
+
+.cta-scroll-lead {
+  font-size: clamp(13px, 1.1vw, 15px);
+  line-height: 1.6;
+  max-width: 560px;
+  margin: 0 auto 24px;
+}
+
+.cta-footer-strip {
+  margin-top: 24px;
+  font: 10px 'DM Mono', monospace;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--ink-subtle);
+  border-top: 1px solid rgba(18, 21, 24, 0.15);
+  padding-top: 12px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Responsiveness for Smaller Viewports */
+@media (max-width: 900px) {
+  .parchment-scroll {
+    padding: 30px 50px;
+  }
+  .signal-telemetry-row,
+  .zones-scroll-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .scroll-chopper-logo {
+    max-width: 80vw;
+  }
+  .hero-scroll-title,
+  .signal-scroll-layout h2,
+  .engine-scroll-layout h2,
+  .zones-scroll-layout h2,
+  .cta-scroll-layout h2 {
+    font-size: 26px;
+  }
+}
+
+
+/* Floating Map Beacon on Landing Page */
+.floating-map-beacon {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 50;
+  background: rgba(8, 29, 46, 0.9);
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  backdrop-filter: blur(10px);
+  padding: 10px 18px;
+  border-radius: 30px;
+  font: 11px 'DM Mono', monospace;
+  letter-spacing: 1.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(242, 55, 148, 0.3);
+  transition: all 0.25s ease;
+}
+
+.floating-map-beacon:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 12px 30px rgba(242, 55, 148, 0.5);
+}
+
+.floating-map-beacon:hover svg {
+  color: #fff;
+}
+
+.link-style-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
