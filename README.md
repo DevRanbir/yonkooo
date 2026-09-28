@@ -1,11 +1,12 @@
 <!-- PROJECT IMAGE / BANNER -->
 <p align="center">
-  <img width="1862" height="1055" alt="Den Den Mushi SOS Landing Banner" src="public/landing-command-frame.png" />
+  <img width="1862" height="1055" alt="Den Den Mushi SOS Landing Banner" src="https://github.com/user-attachments/assets/57f519ff-1e26-42d8-adf7-134a5d5a2d5a" />
+
 </p>
 
-# 🐌 Den Den Mushi SOS (Yonko Emergency Network)
+# 🐌 Yonkooo Emergency Network
 
-> A premium, immersive, One Piece-inspired emergency coordination system and interactive 3D Den Den Mushi transponder network with real-time Firebase dispatch, tactical triage dashboard, maritime radar map, and synthesized audio.
+> A premium, immersive, One Piece-inspired emergency coordination system and interactive 3D Den Den Mushi transponder network with real-time Firebase dispatch, tactical triage dashboard, maritime radar map, and synthesized audio. Visit it now https://yonkooo.appwrite.network
 
 ---
 
@@ -365,9 +366,8 @@ yonkooo/
 
 ## 👥 Team / Author
 
-* **Name:** DevRanbir
-* **GitHub:** [https://github.com/DevRanbir](https://github.com/DevRanbir)
-* **Project Repository:** [https://github.com/DevRanbir/yonkooo](https://github.com/DevRanbir/yonkooo)
+* **Name:** Yonkooo
+* **Live Site:** https://yonkooo.appwrite.network
 
 ---
 
